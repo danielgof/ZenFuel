@@ -3,14 +3,36 @@ export interface VehicleOption {
   value: string;
 }
 
-const BASE_URL = "/api";
+export interface VehicleDetails {
+  cityMpg: string;
+  highwayMpg: string;
+  combinedMpg: string;
+  fuelType: string;
+  drive: string;
+  transmission: string;
+}
 
-async function fetchXML(endpoint: string) {
+/* ========================================
+   API CONFIG
+======================================== */
+
+const BASE_URL =
+  "https://www.fueleconomy.gov/ws/rest";
+
+/* ========================================
+   GENERIC XML FETCHER
+======================================== */
+
+async function fetchXML(
+  endpoint: string
+): Promise<Document> {
+  const url = `${BASE_URL}${endpoint}`;
+
   try {
-    const response = await fetch(`${BASE_URL}${endpoint}`, {
+    const response = await fetch(url, {
       method: "GET",
       headers: {
-        Accept: "application/xml,text/xml",
+        Accept: "application/xml",
       },
     });
 
@@ -22,52 +44,96 @@ async function fetchXML(endpoint: string) {
 
     const text = await response.text();
 
-    if (!text || text.includes("502 Bad Gateway")) {
-      throw new Error("Invalid XML response");
+    if (!text) {
+      throw new Error("Empty response");
+    }
+
+    // Some APIs return HTML error pages
+    if (
+      text.includes("<html") ||
+      text.includes("502 Bad Gateway")
+    ) {
+      throw new Error(
+        "Server returned invalid XML"
+      );
     }
 
     const parser = new DOMParser();
 
-    const xml = parser.parseFromString(text, "text/xml");
+    const xml = parser.parseFromString(
+      text,
+      "application/xml"
+    );
 
     const parserError =
-      xml.getElementsByTagName("parsererror");
+      xml.querySelector("parsererror");
 
-    if (parserError.length > 0) {
-      throw new Error("XML Parsing failed");
+    if (parserError) {
+      console.error(
+        "XML Parse Error:",
+        parserError.textContent
+      );
+
+      throw new Error("XML parsing failed");
     }
 
     return xml;
-  } catch (err) {
-    console.error("fetchXML failed:", endpoint, err);
-    throw err;
+  } catch (error) {
+    console.error(
+      `fetchXML failed for ${url}`,
+      error
+    );
+
+    throw error;
   }
 }
 
-/* =========================
+/* ========================================
+   XML HELPERS
+======================================== */
+
+function getTextContent(
+  parent: Element | Document,
+  tag: string,
+  fallback = ""
+): string {
+  return (
+    parent.getElementsByTagName(tag)[0]
+      ?.textContent?.trim() || fallback
+  );
+}
+
+function parseMenuItems(
+  xml: Document
+): Element[] {
+  return Array.from(
+    xml.getElementsByTagName("menuItem")
+  );
+}
+
+/* ========================================
    YEARS
-========================= */
+======================================== */
 
 export async function getYears(): Promise<string[]> {
   try {
-    const xml = await fetchXML("/vehicle/menu/year");
-
-    return Array.from(
-      xml.getElementsByTagName("menuItem")
-    ).map(
-      (item) =>
-        item.getElementsByTagName("value")[0]
-          ?.textContent || ""
+    const xml = await fetchXML(
+      "/vehicle/menu/year"
     );
-  } catch (err) {
-    console.error("getYears failed", err);
+
+    return parseMenuItems(xml).map((item) =>
+      getTextContent(item, "value")
+    );
+  } catch (error) {
+    console.error("getYears failed", error);
+
     return [];
   }
 }
 
-/* =========================
+/* ========================================
    MAKES
-========================= */
+======================================== */
 
 export async function getMakes(
   year: string
@@ -79,22 +145,19 @@ export async function getMakes(
       )}`
     );
 
-    return Array.from(
-      xml.getElementsByTagName("menuItem")
-    ).map(
-      (item) =>
-        item.getElementsByTagName("value")[0]
-          ?.textContent || ""
+    return parseMenuItems(xml).map((item) =>
+      getTextContent(item, "value")
     );
-  } catch (err) {
-    console.error("getMakes failed", err);
+  } catch (error) {
+    console.error("getMakes failed", error);
+
     return [];
   }
 }
 
-/* =========================
+/* ========================================
    MODELS
-========================= */
+======================================== */
 
 export async function getModels(
   year: string,
@@ -107,22 +170,19 @@ export async function getModels(
       )}&make=${encodeURIComponent(make)}`
     );
 
-    return Array.from(
-      xml.getElementsByTagName("menuItem")
-    ).map(
-      (item) =>
-        item.getElementsByTagName("value")[0]
-          ?.textContent || ""
+    return parseMenuItems(xml).map((item) =>
+      getTextContent(item, "value")
     );
-  } catch (err) {
-    console.error("getModels failed", err);
+  } catch (error) {
+    console.error("getModels failed", error);
+
     return [];
   }
 }
 
-/* =========================
+/* ========================================
    OPTIONS / TRIMS
-========================= */
+======================================== */
 
 export async function getOptions(
   year: string,
@@ -138,68 +198,81 @@ export async function getOptions(
       )}&model=${encodeURIComponent(model)}`
     );
 
-    return Array.from(
-      xml.getElementsByTagName("menuItem")
-    ).map((item) => ({
-      text:
-        item.getElementsByTagName("text")[0]
-          ?.textContent || "",
-
-      value:
-        item.getElementsByTagName("value")[0]
-          ?.textContent || "",
+    return parseMenuItems(xml).map((item) => ({
+      text: getTextContent(item, "text"),
+      value: getTextContent(item, "value"),
     }));
-  } catch (err) {
-    console.error("getOptions failed", err);
+  } catch (error) {
+    console.error("getOptions failed", error);
+
     return [];
   }
 }
 
-/* =========================
+/* ========================================
    VEHICLE DETAILS
-========================= */
+======================================== */
 
-export async function getVehicleDetails(id: string) {
+export async function getVehicleDetails(
+  id: string
+): Promise<VehicleDetails> {
+  const fallback: VehicleDetails = {
+    cityMpg: "N/A",
+    highwayMpg: "N/A",
+    combinedMpg: "N/A",
+    fuelType: "N/A",
+    drive: "N/A",
+    transmission: "N/A",
+  };
+
   try {
     const xml = await fetchXML(
       `/vehicle/${encodeURIComponent(id)}`
     );
 
     return {
-      cityMpg:
-        xml.getElementsByTagName("city08")[0]
-          ?.textContent || "N/A",
+      cityMpg: getTextContent(
+        xml,
+        "city08",
+        "N/A"
+      ),
 
-      highwayMpg:
-        xml.getElementsByTagName("highway08")[0]
-          ?.textContent || "N/A",
+      highwayMpg: getTextContent(
+        xml,
+        "highway08",
+        "N/A"
+      ),
 
-      combinedMpg:
-        xml.getElementsByTagName("comb08")[0]
-          ?.textContent || "N/A",
+      combinedMpg: getTextContent(
+        xml,
+        "comb08",
+        "N/A"
+      ),
 
-      fuelType:
-        xml.getElementsByTagName("fuelType")[0]
-          ?.textContent || "N/A",
+      fuelType: getTextContent(
+        xml,
+        "fuelType",
+        "N/A"
+      ),
 
-      drive:
-        xml.getElementsByTagName("drive")[0]
-          ?.textContent || "N/A",
+      drive: getTextContent(
+        xml,
+        "drive",
+        "N/A"
+      ),
 
-      transmission:
-        xml.getElementsByTagName("trany")[0]
-          ?.textContent || "N/A",
+      transmission: getTextContent(
+        xml,
+        "trany",
+        "N/A"
+      ),
     };
-  } catch (err) {
-    console.error("getVehicleDetails failed", err);
+  } catch (error) {
+    console.error(
+      "getVehicleDetails failed",
+      error
+    );
 
-    return {
-      cityMpg: "N/A",
-      highwayMpg: "N/A",
-      combinedMpg: "N/A",
-      fuelType: "N/A",
-      drive: "N/A",
-      transmission: "N/A",
-    };
+    return fallback;
   }
 }
