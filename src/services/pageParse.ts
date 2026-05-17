@@ -4,6 +4,8 @@ type VehicleData = {
   models: string[];
 };
 
+declare const chrome: any;
+
 /**
  * Extracts options from a <select> element.
  */

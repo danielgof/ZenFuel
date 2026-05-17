@@ -15,6 +15,8 @@ import { MetricCard } from "./components/MetricCard";
 import { SelectorCard } from "./components/SelectorCard";
 import { InfoCard } from "./components/InfoCard";
 
+declare const chrome: any;
+
 function App() {
   const [years, setYears] = useState<string[]>([]);
   const [makes, setMakes] = useState<string[]>([]);
@@ -95,13 +97,22 @@ function App() {
   }, [selectedVehicleId]);
 
   useEffect(() => {
-    chrome.runtime.onMessage.addListener((message) => {
-      if (message.type === "VEHICLE_DATA") {
-        setYears(message.payload.years);
-        setMakes(message.payload.makes);
-        setModels(message.payload.models);
-      }
-    });
+    chrome.runtime.onMessage.addListener(
+      (message: {
+        type: string;
+        payload: {
+          years: string[];
+          makes: string[];
+          models: string[];
+        };
+      }) => {
+        if (message.type === "VEHICLE_DATA") {
+          setYears(message.payload.years);
+          setMakes(message.payload.makes);
+          setModels(message.payload.models);
+        }
+      },
+    );
   }, []);
 
   return (
