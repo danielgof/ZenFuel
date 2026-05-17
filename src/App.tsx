@@ -94,6 +94,16 @@ function App() {
       .finally(() => setLoading(false));
   }, [selectedVehicleId]);
 
+  useEffect(() => {
+    chrome.runtime.onMessage.addListener((message) => {
+      if (message.type === "VEHICLE_DATA") {
+        setYears(message.payload.years);
+        setMakes(message.payload.makes);
+        setModels(message.payload.models);
+      }
+    });
+  }, []);
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950 text-white p-6">
       <div className="max-w-5xl mx-auto">

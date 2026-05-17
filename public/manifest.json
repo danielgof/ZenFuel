@@ -11,5 +11,13 @@
     "16": "zenfuel.png",
     "48": "zenfuel.png",
     "128": "zenfuel.png"
-  }
+  },
+  "permissions": [
+    "activeTab",
+    "scripting"
+  ],
+
+  "host_permissions": [
+    "<all_urls>"
+  ]
 }
