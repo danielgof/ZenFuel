@@ -5,6 +5,11 @@
   "manifest_version": 3,
   "action": {
     "default_popup": "index.html",
-    "default_icon": "icon.png"
+    "default_icon": "favicon.svg"
+  },
+  "icons": {
+    "16": "favicon.svg",
+    "48": "favicon.svg",
+    "128": "favicon.svg"
   }
 }
