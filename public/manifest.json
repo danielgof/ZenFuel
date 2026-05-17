@@ -5,11 +5,11 @@
   "manifest_version": 3,
   "action": {
     "default_popup": "index.html",
-    "default_icon": "favicon.svg"
+    "default_icon": "zenfuel.png"
   },
   "icons": {
-    "16": "favicon.svg",
-    "48": "favicon.svg",
-    "128": "favicon.svg"
+    "16": "zenfuel.png",
+    "48": "zenfuel.png",
+    "128": "zenfuel.png"
   }
 }
