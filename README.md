@@ -7,7 +7,7 @@ ZenFuel is a small React + TypeScript project built with Vite. It also produces 
 - Extension `manifest.json` in `public/` copied to `build/` during the build
 
 ## Prerequisites
-- Node.js (v16 or later recommended)
+- Node.js (v20.19.0 or later recommended)
 - npm (bundled with Node.js)
 
 ## Quick start
