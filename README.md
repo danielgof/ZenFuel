@@ -1,73 +1,66 @@
-# React + TypeScript + Vite
+# ZenFuel
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+ZenFuel is a small React + TypeScript project built with Vite. It also produces a Chromium extension (Manifest V3) in the `build/` folder after running the production build.
 
-Currently, two official plugins are available:
+**What's included**
+- React + TypeScript application scaffolded for Vite
+- Extension `manifest.json` in `public/` copied to `build/` during the build
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+## Prerequisites
+- Node.js (v16 or later recommended)
+- npm (bundled with Node.js)
 
-## React Compiler
+## Quick start
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+Install dependencies:
 
-## Expanding the ESLint configuration
-
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
-
-```js
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-
-      // Remove tseslint.configs.recommended and replace with this
-      tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      tseslint.configs.stylisticTypeChecked,
-
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+```bash
+npm install
 ```
 
-You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
+Start the dev server (hot reload):
 
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
-
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+```bash
+npm run dev
 ```
+
+Build production output (generates `build/`):
+
+```bash
+npm run build
+```
+
+Preview the built site locally:
+
+```bash
+npm run preview
+```
+
+## Loading the extension (unpacked)
+
+1. Run `npm run build` to produce the `build/` folder.
+2. Open the browser extensions page (`chrome://extensions` or `edge://extensions`).
+3. Enable *Developer mode*.
+4. Click *Load unpacked* and select the `build/` folder from this repository.
+
+The extension popup uses `build/index.html` and the manifest is `build/manifest.json`.
+
+## Troubleshooting
+
+- Could not load icon 'icon.svg': this error means the manifest references an icon file that doesn't exist in `public/`. The repository includes `favicon.svg` and `icons.svg` in `public/`. Update `public/manifest.json` to reference an existing file (the repo's manifest has been updated to use `favicon.svg`). After editing `public/manifest.json`, re-run `npm run build` and reload the unpacked extension.
+- Manifest fails to load after build: open `build/manifest.json` and verify that all paths (icons, popup) are relative and the files exist in `build/`.
+
+## Development notes
+
+- Vite copies files from `public/` into the root of the `build/` directory. Ensure any asset referenced by `public/manifest.json` lives in `public/`.
+- If you add icons, place them in `public/` (e.g., `public/icons/`) and reference the relative paths in `manifest.json`.
+
+## Next steps (optional)
+
+- Add explicitly-sized PNG/SVG icons to `public/` and reference them in `public/manifest.json`.
+- Add a `CONTRIBUTING.md` with testing instructions and extension-loading tips.
+- Add CI to run `npm run build` and validate `build/manifest.json` exists.
+
+---
+
+If you'd like, I can add icon files to `public/` and update the manifest accordingly — tell me which sizes or formats you prefer (SVG/PNG).

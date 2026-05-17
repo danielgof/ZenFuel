@@ -1,132 +1,129 @@
-import { useState } from "react";
-import "./App.css";
+import { useEffect, useState } from "react";
+
+import {
+  getYears,
+  getMakes,
+  getModels,
+  getOptions,
+  getVehicleDetails,
+} from "./services/fuelEconomyApi";
 
 function App() {
-  const [vehicle, setVehicle] = useState("Sedan");
-  const [fuelType, setFuelType] = useState("Gasoline");
-  const [milesDriven, setMilesDriven] = useState(120);
-  const [gallonsUsed, setGallonsUsed] = useState(4);
-  const [fuelPrice, setFuelPrice] = useState(3.69);
+  const [years, setYears] = useState<string[]>([]);
+  const [makes, setMakes] = useState<string[]>([]);
+  const [models, setModels] = useState<string[]>([]);
+  const [options, setOptions] = useState<any[]>([]);
 
-  const mpg =
-    gallonsUsed > 0 ? (milesDriven / gallonsUsed).toFixed(1) : "0";
+  const [selectedYear, setSelectedYear] = useState("");
+  const [selectedMake, setSelectedMake] = useState("");
+  const [selectedModel, setSelectedModel] = useState("");
+  const [selectedVehicleId, setSelectedVehicleId] = useState("");
 
-  const estimatedCost = (gallonsUsed * fuelPrice).toFixed(2);
+  const [vehicleData, setVehicleData] = useState<any>(null);
+
+  // Load years
+  useEffect(() => {
+    getYears().then(setYears);
+  }, []);
+
+  // Load makes
+  useEffect(() => {
+    if (selectedYear) {
+      getMakes(selectedYear).then(setMakes);
+    }
+  }, [selectedYear]);
+
+  // Load models
+  useEffect(() => {
+    if (selectedYear && selectedMake) {
+      getModels(selectedYear, selectedMake).then(setModels);
+    }
+  }, [selectedYear, selectedMake]);
+
+  // Load options
+  useEffect(() => {
+    if (selectedYear && selectedMake && selectedModel) {
+      getOptions(
+        selectedYear,
+        selectedMake,
+        selectedModel
+      ).then(setOptions);
+    }
+  }, [selectedYear, selectedMake, selectedModel]);
+
+  // Load MPG data
+  useEffect(() => {
+    if (selectedVehicleId) {
+      getVehicleDetails(selectedVehicleId).then(
+        setVehicleData
+      );
+    }
+  }, [selectedVehicleId]);
 
   return (
     <div className="app">
-      {/* HERO */}
-      <header className="hero">
-        <div>
-          <h1>EcoDrive MPG</h1>
-          <p>Track fuel efficiency and optimize every mile.</p>
-        </div>
+      <h1>ZenFuel MPG Explorer</h1>
 
-        <div className="hero-badge">
-          <span>Live Estimate</span>
-          <strong>{mpg} MPG</strong>
-        </div>
-      </header>
+      <select
+        onChange={(e) => setSelectedYear(e.target.value)}
+      >
+        <option>Select Year</option>
 
-      {/* MAIN GRID */}
-      <div className="dashboard-grid">
-        {/* Vehicle Card */}
-        <section className="card">
-          <h2>Vehicle</h2>
+        {years.map((year) => (
+          <option key={year}>{year}</option>
+        ))}
+      </select>
 
-          <label>Vehicle Type</label>
-          <select
-            value={vehicle}
-            onChange={(e) => setVehicle(e.target.value)}
+      <select
+        onChange={(e) => setSelectedMake(e.target.value)}
+      >
+        <option>Select Make</option>
+
+        {makes.map((make) => (
+          <option key={make}>{make}</option>
+        ))}
+      </select>
+
+      <select
+        onChange={(e) => setSelectedModel(e.target.value)}
+      >
+        <option>Select Model</option>
+
+        {models.map((model) => (
+          <option key={model}>{model}</option>
+        ))}
+      </select>
+
+      <select
+        onChange={(e) =>
+          setSelectedVehicleId(e.target.value)
+        }
+      >
+        <option>Select Trim</option>
+
+        {options.map((option) => (
+          <option
+            key={option.value}
+            value={option.value}
           >
-            <option>Sedan</option>
-            <option>SUV</option>
-            <option>Truck</option>
-            <option>Hybrid</option>
-            <option>Electric</option>
-          </select>
+            {option.text}
+          </option>
+        ))}
+      </select>
 
-          <label>Fuel Type</label>
-          <select
-            value={fuelType}
-            onChange={(e) => setFuelType(e.target.value)}
-          >
-            <option>Gasoline</option>
-            <option>Diesel</option>
-            <option>Premium</option>
-            <option>Electric</option>
-          </select>
-        </section>
+      {vehicleData && (
+        <div className="results-card">
+          <h2>Fuel Economy</h2>
 
-        {/* Input Card */}
-        <section className="card">
-          <h2>Trip Data</h2>
+          <p>City MPG: {vehicleData.cityMpg}</p>
 
-          <label>Miles Driven</label>
-          <input
-            type="number"
-            value={milesDriven}
-            onChange={(e) => setMilesDriven(Number(e.target.value))}
-          />
+          <p>Highway MPG: {vehicleData.highwayMpg}</p>
 
-          <label>Gallons Used</label>
-          <input
-            type="number"
-            value={gallonsUsed}
-            onChange={(e) => setGallonsUsed(Number(e.target.value))}
-          />
+          <p>Combined MPG: {vehicleData.combinedMpg}</p>
 
-          <label>Fuel Price ($)</label>
-          <input
-            type="number"
-            step="0.01"
-            value={fuelPrice}
-            onChange={(e) => setFuelPrice(Number(e.target.value))}
-          />
-        </section>
-
-        {/* Result Card */}
-        <section className="card result-card">
-          <h2>Efficiency</h2>
-
-          <div className="metric">
-            <span>Estimated MPG</span>
-            <strong>{mpg}</strong>
-          </div>
-
-          <div className="metric">
-            <span>Fuel Cost</span>
-            <strong>${estimatedCost}</strong>
-          </div>
-
-          <div className="metric">
-            <span>Vehicle</span>
-            <strong>{vehicle}</strong>
-          </div>
-
-          <div className="progress-container">
-            <div
-              className="progress-bar"
-              style={{
-                width: `${Math.min(Number(mpg) * 2, 100)}%`,
-              }}
-            />
-          </div>
-
-          <p className="efficiency-text">
-            {Number(mpg) >= 35
-              ? "Excellent fuel efficiency"
-              : Number(mpg) >= 25
-              ? "Good efficiency"
-              : "Room for improvement"}
-          </p>
-        </section>
-      </div>
-
-      {/* Footer */}
-      <footer className="footer">
-        <p>Drive smarter. Save fuel. Reduce emissions.</p>
-      </footer>
+          <p>Fuel Type: {vehicleData.fuelType}</p>
+        </div>
+      )}
     </div>
   );
 }
