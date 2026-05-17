@@ -50,17 +50,5 @@ The extension popup uses `build/index.html` and the manifest is `build/manifest.
 - Could not load icon 'icon.svg': this error means the manifest references an icon file that doesn't exist in `public/`. The repository includes `favicon.svg` and `icons.svg` in `public/`. Update `public/manifest.json` to reference an existing file (the repo's manifest has been updated to use `favicon.svg`). After editing `public/manifest.json`, re-run `npm run build` and reload the unpacked extension.
 - Manifest fails to load after build: open `build/manifest.json` and verify that all paths (icons, popup) are relative and the files exist in `build/`.
 
-## Development notes
 
-- Vite copies files from `public/` into the root of the `build/` directory. Ensure any asset referenced by `public/manifest.json` lives in `public/`.
-- If you add icons, place them in `public/` (e.g., `public/icons/`) and reference the relative paths in `manifest.json`.
 
-## Next steps (optional)
-
-- Add explicitly-sized PNG/SVG icons to `public/` and reference them in `public/manifest.json`.
-- Add a `CONTRIBUTING.md` with testing instructions and extension-loading tips.
-- Add CI to run `npm run build` and validate `build/manifest.json` exists.
-
----
-
-If you'd like, I can add icon files to `public/` and update the manifest accordingly — tell me which sizes or formats you prefer (SVG/PNG).
