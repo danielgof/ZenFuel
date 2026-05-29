@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 
 import { Car, Fuel, Settings2, Calendar, Factory } from 'lucide-react';
 
@@ -16,7 +16,7 @@ import { MetricCard } from './components/MetricCard';
 import { SelectorCard } from './components/SelectorCard';
 import { InfoCard } from './components/InfoCard';
 
-declare const chrome: any;
+// declare const chrome: any;
 
 /* ========================================
    VEHICLE TITLE PARSER
@@ -122,10 +122,12 @@ function App() {
     const [models, setModels] = useState<string[]>([]);
     const [options, setOptions] = useState<VehicleOption[]>([]);
 
-    const [selectedYear, setSelectedYear] = useState('');
-    const [selectedMake, setSelectedMake] = useState('');
-    const [selectedModel, setSelectedModel] = useState('');
-    const [selectedVehicleId, setSelectedVehicleId] = useState('');
+    const [selectors, setSelectors] = useState({
+        year: '',
+        make: '',
+        model: '',
+        vehicleId: '',
+    });
 
     const [vehicleData, setVehicleData] = useState<VehicleDetails | null>(null);
 
@@ -138,9 +140,13 @@ function App() {
         model: '',
     });
 
+    // Track what we've already auto-matched to avoid redundant updates
+    const matchedMakeRef = useRef('');
+    const matchedModelRef = useRef('');
+
     /* ========================================
      LOAD YEARS
-  ======================================== */
+  	======================================== */
 
     useEffect(() => {
         getYears().then(setYears);
@@ -148,54 +154,39 @@ function App() {
 
     /* ========================================
      LOAD MAKES
-  ======================================== */
+ 	======================================== */
 
     useEffect(() => {
-        if (!selectedYear) return;
-
-        setSelectedMake('');
-        setSelectedModel('');
-        setSelectedVehicleId('');
-        setVehicleData(null);
-
-        getMakes(selectedYear).then(setMakes);
-    }, [selectedYear]);
+        if (!selectors.year) return;
+        getMakes(selectors.year).then(setMakes);
+    }, [selectors.year]);
 
     /* ========================================
      LOAD MODELS
-  ======================================== */
+  	======================================== */
 
     useEffect(() => {
-        if (!selectedYear || !selectedMake) return;
-
-        setSelectedModel('');
-        setSelectedVehicleId('');
-        setVehicleData(null);
-
-        getModels(selectedYear, selectedMake).then(setModels);
-    }, [selectedYear, selectedMake]);
+        if (!selectors.year || !selectors.make) return;
+        getModels(selectors.year, selectors.make).then(setModels);
+    }, [selectors.year, selectors.make]);
 
     /* ========================================
      LOAD OPTIONS
-  ======================================== */
+  	======================================== */
 
     useEffect(() => {
-        if (!selectedYear || !selectedMake || !selectedModel) return;
-
-        setSelectedVehicleId('');
-        setVehicleData(null);
-
-        getOptions(selectedYear, selectedMake, selectedModel).then(setOptions);
-    }, [selectedYear, selectedMake, selectedModel]);
+        if (!selectors.year || !selectors.make || !selectors.model) return;
+        getOptions(selectors.year, selectors.make, selectors.model).then(setOptions);
+    }, [selectors.year, selectors.make, selectors.model]);
 
     /* ========================================
      AUTO-DETECT VEHICLE FROM ACTIVE TAB
-  ======================================== */
+  	======================================== */
 
     useEffect(() => {
         chrome.tabs.query(
             { active: true, currentWindow: true },
-            (tabs: any) => {
+            (tabs: chrome.tabs.Tab[]) => {
                 const activeTab = tabs[0];
 
                 if (!activeTab?.id) return;
@@ -224,10 +215,17 @@ function App() {
                             return;
                         }
 
+						interface ScrapeResponse {
+							title: string;
+							url: string;
+							success: boolean;
+							data?: string[];
+						}
+
                         chrome.tabs.sendMessage(
-                            activeTab.id,
+                            activeTab.id!,
                             { action: 'SCRAPE_VEHICLE_DROPDOWNS' },
-                            (response: any) => {
+                            (response: ScrapeResponse) => {
                                 if (chrome.runtime.lastError) {
                                     console.log(
                                         'Message failed:',
@@ -251,7 +249,10 @@ function App() {
 
                                 // AUTO-SELECT YEAR
                                 if (parsed.year) {
-                                    setSelectedYear(parsed.year);
+                                    setSelectors((prev) => ({
+                                        ...prev,
+                                        year: parsed.year,
+                                    }));
                                 }
                             }
                         );
@@ -273,10 +274,14 @@ function App() {
             (m) => m.toLowerCase() === detectedVehicle.make.toLowerCase()
         );
 
-        if (matchedMake) {
+        if (matchedMake && matchedMake !== matchedMakeRef.current) {
             console.log('MATCHED MAKE:', matchedMake);
+            matchedMakeRef.current = matchedMake;
 
-            setSelectedMake(matchedMake);
+            setSelectors((prev) => ({
+                ...prev,
+                make: matchedMake,
+            }));
         }
     }, [makes, detectedVehicle]);
 
@@ -301,26 +306,46 @@ function App() {
             );
         });
 
-        if (matchedModel) {
+        if (matchedModel && matchedModel !== matchedModelRef.current) {
             console.log('MATCHED MODEL:', matchedModel);
+            matchedModelRef.current = matchedModel;
 
-            setSelectedModel(matchedModel);
+            setSelectors((prev) => ({
+                ...prev,
+                model: matchedModel,
+            }));
         }
     }, [models, detectedVehicle]);
 
     /* ========================================
      LOAD VEHICLE DETAILS
-  ======================================== */
+  	======================================== */
 
     useEffect(() => {
-        if (!selectedVehicleId) return;
+        if (!selectors.vehicleId) return;
 
-        setLoading(true);
+        let cancelled = false;
 
-        getVehicleDetails(selectedVehicleId)
-            .then(setVehicleData)
-            .finally(() => setLoading(false));
-    }, [selectedVehicleId]);
+        (async () => {
+            if (cancelled) return;
+            setLoading(true);
+
+            try {
+                const data = await getVehicleDetails(selectors.vehicleId);
+                if (!cancelled) {
+                    setVehicleData(data);
+                }
+            } finally {
+                if (!cancelled) {
+                    setLoading(false);
+                }
+            }
+        })();
+
+        return () => {
+            cancelled = true;
+        };
+    }, [selectors.vehicleId]);
 
     return (
         <div
@@ -421,10 +446,16 @@ function App() {
                             className="min-w-[180px] flex-1"
                         >
                             <select
-                                value={selectedYear}
-                                onChange={(e) =>
-                                    setSelectedYear(e.target.value)
-                                }
+                                value={selectors.year}
+                                onChange={(e) => {
+                                    setSelectors({
+                                        year: e.target.value,
+                                        make: '',
+                                        model: '',
+                                        vehicleId: '',
+                                    });
+                                    setVehicleData(null);
+                                }}
                                 className="
         w-full
         h-12
@@ -460,11 +491,17 @@ function App() {
                             className="min-w-[180px] flex-1"
                         >
                             <select
-                                value={selectedMake}
-                                disabled={!selectedYear}
-                                onChange={(e) =>
-                                    setSelectedMake(e.target.value)
-                                }
+                                value={selectors.make}
+                                disabled={!selectors.year}
+                                onChange={(e) => {
+                                    setSelectors((prev) => ({
+                                        ...prev,
+                                        make: e.target.value,
+                                        model: '',
+                                        vehicleId: '',
+                                    }));
+                                    setVehicleData(null);
+                                }}
                                 className="
         w-full
         h-12
@@ -501,11 +538,16 @@ function App() {
                             className="min-w-[180px] flex-1"
                         >
                             <select
-                                value={selectedModel}
-                                disabled={!selectedMake}
-                                onChange={(e) =>
-                                    setSelectedModel(e.target.value)
-                                }
+                                value={selectors.model}
+                                disabled={!selectors.make}
+                                onChange={(e) => {
+                                    setSelectors((prev) => ({
+                                        ...prev,
+                                        model: e.target.value,
+                                        vehicleId: '',
+                                    }));
+                                    setVehicleData(null);
+                                }}
                                 className="
         w-full
         h-12
@@ -542,10 +584,13 @@ function App() {
                             className="min-w-[180px] flex-1"
                         >
                             <select
-                                value={selectedVehicleId}
-                                disabled={!selectedModel}
+                                value={selectors.vehicleId}
+                                disabled={!selectors.model}
                                 onChange={(e) =>
-                                    setSelectedVehicleId(e.target.value)
+                                    setSelectors((prev) => ({
+                                        ...prev,
+                                        vehicleId: e.target.value,
+                                    }))
                                 }
                                 className="
         w-full
