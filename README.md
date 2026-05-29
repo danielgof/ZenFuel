@@ -1,6 +1,6 @@
 # ZenFuel
 
-ZenFuel is a small React + TypeScript project built with Vite. It also produces a Chromium extension (Manifest V3) in the `build/` folder after running the production build.
+ZenFuel is a small Chrome extension that targets to help with analysis of vehicals fuel economy by referencing [https://www.fueleconomy.gov/](https://www.fueleconomy.gov/)
 
 **What's included**
 - React + TypeScript application scaffolded for Vite

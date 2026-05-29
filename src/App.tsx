@@ -11,11 +11,110 @@ import {
   type VehicleOption,
   type VehicleDetails,
 } from "./services/fuelEconomyApi";
+
 import { MetricCard } from "./components/MetricCard";
 import { SelectorCard } from "./components/SelectorCard";
 import { InfoCard } from "./components/InfoCard";
 
 declare const chrome: any;
+
+/* ========================================
+   VEHICLE TITLE PARSER
+======================================== */
+
+const MAKES = [
+  "Acura",
+  "Audi",
+  "BMW",
+  "Buick",
+  "Cadillac",
+  "Chevrolet",
+  "Chrysler",
+  "Dodge",
+  "Ford",
+  "GMC",
+  "Honda",
+  "Hyundai",
+  "Infiniti",
+  "Jeep",
+  "Kia",
+  "Lexus",
+  "Mazda",
+  "Mercedes",
+  "Nissan",
+  "Subaru",
+  "Tesla",
+  "Toyota",
+  "Volkswagen",
+  "Volvo",
+];
+
+function parseVehicleTitle(title: string) {
+  const cleaned = title.replace(/\|.*$/, "").replace(/[-–—]/g, " ").trim();
+
+  const words = cleaned.split(/\s+/);
+
+  let year = "";
+  let make = "";
+  let model = "";
+
+  // YEAR
+  const yearMatch = cleaned.match(/\b(19|20)\d{2}\b/);
+
+  if (yearMatch) {
+    year = yearMatch[0];
+  }
+
+  // MAKE
+  for (const word of words) {
+    const found = MAKES.find((m) => m.toLowerCase() === word.toLowerCase());
+
+    if (found) {
+      make = found;
+      break;
+    }
+  }
+
+  // MODEL
+  if (make) {
+    const makeIndex = words.findIndex(
+      (w) => w.toLowerCase() === make.toLowerCase(),
+    );
+
+    const stopWords = [
+      "SUV",
+      "Sedan",
+      "Truck",
+      "Crossover",
+      "Hybrid",
+      "Coupe",
+      "EV",
+      "Electric",
+      "Vehicle",
+      "Cars",
+    ];
+
+    const modelWords: string[] = [];
+
+    for (let i = makeIndex + 1; i < words.length; i++) {
+      const word = words[i];
+
+      if (stopWords.some((s) => s.toLowerCase() === word.toLowerCase())) {
+        break;
+      }
+
+      modelWords.push(word);
+    }
+
+    model = modelWords.join(" ");
+  }
+
+  return {
+    year,
+    make,
+    model,
+  };
+}
 
 function App() {
   const [years, setYears] = useState<string[]>([]);
@@ -31,6 +130,13 @@ function App() {
   const [vehicleData, setVehicleData] = useState<VehicleDetails | null>(null);
 
   const [loading, setLoading] = useState(false);
+
+  // DETECTED VEHICLE FROM PAGE TITLE
+  const [detectedVehicle, setDetectedVehicle] = useState({
+    year: "",
+    make: "",
+    model: "",
+  });
 
   /* ========================================
      LOAD YEARS
@@ -83,6 +189,119 @@ function App() {
   }, [selectedYear, selectedMake, selectedModel]);
 
   /* ========================================
+     AUTO-DETECT VEHICLE FROM ACTIVE TAB
+  ======================================== */
+
+  useEffect(() => {
+    chrome.tabs.query({ active: true, currentWindow: true }, (tabs: any) => {
+      const activeTab = tabs[0];
+
+      if (!activeTab?.id) return;
+
+      if (
+        activeTab.url?.startsWith("chrome://") ||
+        activeTab.url?.startsWith("edge://")
+      ) {
+        console.log("Cannot run extensions on browser internal pages.");
+        return;
+      }
+
+      chrome.scripting.executeScript(
+        {
+          target: { tabId: activeTab.id },
+          files: ["content.js"],
+        },
+        () => {
+          if (chrome.runtime.lastError) {
+            console.error(
+              "Injection failed:",
+              chrome.runtime.lastError.message,
+            );
+            return;
+          }
+
+          chrome.tabs.sendMessage(
+            activeTab.id,
+            { action: "SCRAPE_VEHICLE_DROPDOWNS" },
+            (response: any) => {
+              if (chrome.runtime.lastError) {
+                console.log(
+                  "Message failed:",
+                  chrome.runtime.lastError.message,
+                );
+                return;
+              }
+
+              if (!response) return;
+
+              console.log("PAGE TITLE:", response.title);
+              console.log("PAGE URL:", response.url);
+
+              const parsed = parseVehicleTitle(response.title);
+
+              console.log("PARSED VEHICLE:", parsed);
+
+              setDetectedVehicle(parsed);
+
+              // AUTO-SELECT YEAR
+              if (parsed.year) {
+                setSelectedYear(parsed.year);
+              }
+            },
+          );
+        },
+      );
+    });
+  }, []);
+
+  /* ========================================
+     AUTO-MATCH MAKE
+  ======================================== */
+
+  useEffect(() => {
+    if (!detectedVehicle.make) return;
+    if (makes.length === 0) return;
+
+    const matchedMake = makes.find(
+      (m) => m.toLowerCase() === detectedVehicle.make.toLowerCase(),
+    );
+
+    if (matchedMake) {
+      console.log("MATCHED MAKE:", matchedMake);
+
+      setSelectedMake(matchedMake);
+    }
+  }, [makes, detectedVehicle]);
+
+  /* ========================================
+     AUTO-MATCH MODEL
+  ======================================== */
+
+  useEffect(() => {
+    if (!detectedVehicle.model) return;
+    if (models.length === 0) return;
+
+    const normalizedDetected = detectedVehicle.model
+      .toLowerCase()
+      .replace(/\s+/g, "");
+
+    const matchedModel = models.find((m) => {
+      const normalizedModel = m.toLowerCase().replace(/\s+/g, "");
+
+      return (
+        normalizedModel.includes(normalizedDetected) ||
+        normalizedDetected.includes(normalizedModel)
+      );
+    });
+
+    if (matchedModel) {
+      console.log("MATCHED MODEL:", matchedModel);
+
+      setSelectedModel(matchedModel);
+    }
+  }, [models, detectedVehicle]);
+
+  /* ========================================
      LOAD VEHICLE DETAILS
   ======================================== */
 
@@ -96,142 +315,319 @@ function App() {
       .finally(() => setLoading(false));
   }, [selectedVehicleId]);
 
-  useEffect(() => {
-    chrome.runtime.onMessage.addListener(
-      (message: {
-        type: string;
-        payload: {
-          years: string[];
-          makes: string[];
-          models: string[];
-        };
-      }) => {
-        if (message.type === "VEHICLE_DATA") {
-          setYears(message.payload.years);
-          setMakes(message.payload.makes);
-          setModels(message.payload.models);
-        }
-      },
-    );
-  }, []);
-
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950 text-white p-6">
-      <div className="max-w-5xl mx-auto">
-        {/* HERO */}
-        <div className="mb-10">
-          <div className="inline-flex items-center gap-3 bg-white/10 border border-white/10 px-4 py-2 rounded-full mb-4 backdrop-blur-xl">
-            <Car size={18} />
-            <span className="text-sm font-medium">ZenFuel Explorer</span>
+    <div
+      className="
+      min-h-screen
+      bg-[radial-gradient(circle_at_top,rgba(37,99,235,0.18),transparent_35%),linear-gradient(to_bottom_right,#020617,#000814,#020617)]
+      text-white
+      p-5
+    "
+    >
+      <div className="max-w-4xl mx-auto">
+        {/* HEADER */}
+        <div className="mb-6">
+          <div
+            className="
+            inline-flex
+            items-center
+            gap-3
+            px-5
+            py-3
+            rounded-full
+            bg-white/[0.05]
+            border
+            border-white/10
+            backdrop-blur-2xl
+            shadow-lg
+          "
+          >
+            <div
+              className="
+              w-8
+              h-8
+              rounded-full
+              bg-emerald-500/15
+              flex
+              items-center
+              justify-center
+            "
+            >
+              <Car size={16} className="text-emerald-300" />
+            </div>
+
+            <div>
+              <div className="text-sm font-semibold tracking-wide">
+                ZenFuel Explorer
+              </div>
+
+              <div className="text-[11px] text-slate-400">
+                Smart vehicle fuel lookup
+              </div>
+            </div>
           </div>
 
-          <h1 className="text-5xl font-black tracking-tight mb-3">
-            Vehicle MPG Lookup
-          </h1>
-
-          <p className="text-slate-400 text-lg max-w-2xl">
-            Browse official EPA fuel economy data with a modern streamlined
-            interface.
-          </p>
+          {/* AUTO DETECT STATUS */}
+          {detectedVehicle.make && (
+            <div className="mt-4 text-sm text-emerald-300/80 px-1">
+              Detected{" "}
+              <span className="font-medium text-white">
+                {detectedVehicle.year} {detectedVehicle.make}{" "}
+                {detectedVehicle.model}
+              </span>
+            </div>
+          )}
         </div>
 
-        {/* SELECTORS */}
-        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-5 mb-8">
-          {/* YEAR */}
-          <SelectorCard icon={<Calendar size={18} />} label="Year">
-            <select
-              value={selectedYear}
-              onChange={(e) => setSelectedYear(e.target.value)}
-              className="select"
+        {/* SELECTORS CONTAINER */}
+        <div
+          className="
+          relative
+          overflow-hidden
+          rounded-[32px]
+          border
+          border-white/10
+          bg-white/[0.03]
+          backdrop-blur-2xl
+          shadow-[0_0_50px_rgba(0,0,0,0.45)]
+          p-4
+        "
+        >
+          {/* subtle glow */}
+          <div
+            className="
+            absolute
+            inset-0
+            bg-gradient-to-br
+            from-blue-500/[0.04]
+            via-transparent
+            to-emerald-500/[0.03]
+            pointer-events-none
+          "
+          />
+
+          <div className="relative flex gap-4 overflow-x-auto scrollbar-none">
+            {/* YEAR */}
+            <SelectorCard
+              icon={<Calendar size={16} />}
+              label="Year"
+              className="min-w-[180px] flex-1"
             >
-              <option value="">Select Year</option>
+              <select
+                value={selectedYear}
+                onChange={(e) => setSelectedYear(e.target.value)}
+                className="
+        w-full
+        h-12
+        rounded-2xl
+        border
+        border-white/10
+        bg-black/20
+        px-4
+        text-sm
+        text-white
+        outline-none
+        transition-all
+        duration-200
+        hover:border-white/20
+        focus:border-emerald-400/40
+        focus:bg-white/[0.04]
+      "
+              >
+                <option value="">Select</option>
 
-              {years.map((year) => (
-                <option key={year} value={year}>
-                  {year}
-                </option>
-              ))}
-            </select>
-          </SelectorCard>
+                {years.map((year) => (
+                  <option key={year} value={year}>
+                    {year}
+                  </option>
+                ))}
+              </select>
+            </SelectorCard>
 
-          {/* MAKE */}
-          <SelectorCard icon={<Factory size={18} />} label="Make">
-            <select
-              value={selectedMake}
-              disabled={!selectedYear}
-              onChange={(e) => setSelectedMake(e.target.value)}
-              className="select"
+            {/* MAKE */}
+            <SelectorCard
+              icon={<Factory size={16} />}
+              label="Make"
+              className="min-w-[180px] flex-1"
             >
-              <option value="">Select Make</option>
+              <select
+                value={selectedMake}
+                disabled={!selectedYear}
+                onChange={(e) => setSelectedMake(e.target.value)}
+                className="
+        w-full
+        h-12
+        rounded-2xl
+        border
+        border-white/10
+        bg-black/20
+        px-4
+        text-sm
+        text-white
+        outline-none
+        transition-all
+        duration-200
+        hover:border-white/20
+        focus:border-emerald-400/40
+        focus:bg-white/[0.04]
+        disabled:opacity-50
+      "
+              >
+                <option value="">Select</option>
 
-              {makes.map((make) => (
-                <option key={make} value={make}>
-                  {make}
-                </option>
-              ))}
-            </select>
-          </SelectorCard>
+                {makes.map((make) => (
+                  <option key={make} value={make}>
+                    {make}
+                  </option>
+                ))}
+              </select>
+            </SelectorCard>
 
-          {/* MODEL */}
-          <SelectorCard icon={<Car size={18} />} label="Model">
-            <select
-              value={selectedModel}
-              disabled={!selectedMake}
-              onChange={(e) => setSelectedModel(e.target.value)}
-              className="select"
+            {/* MODEL */}
+            <SelectorCard
+              icon={<Car size={16} />}
+              label="Model"
+              className="min-w-[180px] flex-1"
             >
-              <option value="">Select Model</option>
+              <select
+                value={selectedModel}
+                disabled={!selectedMake}
+                onChange={(e) => setSelectedModel(e.target.value)}
+                className="
+        w-full
+        h-12
+        rounded-2xl
+        border
+        border-white/10
+        bg-black/20
+        px-4
+        text-sm
+        text-white
+        outline-none
+        transition-all
+        duration-200
+        hover:border-white/20
+        focus:border-emerald-400/40
+        focus:bg-white/[0.04]
+        disabled:opacity-50
+      "
+              >
+                <option value="">Select</option>
 
-              {models.map((model) => (
-                <option key={model} value={model}>
-                  {model}
-                </option>
-              ))}
-            </select>
-          </SelectorCard>
+                {models.map((model) => (
+                  <option key={model} value={model}>
+                    {model}
+                  </option>
+                ))}
+              </select>
+            </SelectorCard>
 
-          {/* TRIM */}
-          <SelectorCard icon={<Settings2 size={18} />} label="Trim">
-            <select
-              value={selectedVehicleId}
-              disabled={!selectedModel}
-              onChange={(e) => setSelectedVehicleId(e.target.value)}
-              className="select"
+            {/* TRIM */}
+            <SelectorCard
+              icon={<Settings2 size={16} />}
+              label="Trim"
+              className="min-w-[180px] flex-1"
             >
-              <option value="">Select Trim</option>
+              <select
+                value={selectedVehicleId}
+                disabled={!selectedModel}
+                onChange={(e) => setSelectedVehicleId(e.target.value)}
+                className="
+        w-full
+        h-12
+        rounded-2xl
+        border
+        border-white/10
+        bg-black/20
+        px-4
+        text-sm
+        text-white
+        outline-none
+        transition-all
+        duration-200
+        hover:border-white/20
+        focus:border-emerald-400/40
+        focus:bg-white/[0.04]
+        disabled:opacity-50
+      "
+              >
+                <option value="">Select</option>
 
-              {options.map((option) => (
-                <option key={option.value} value={option.value}>
-                  {option.text}
-                </option>
-              ))}
-            </select>
-          </SelectorCard>
+                {options.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.text}
+                  </option>
+                ))}
+              </select>
+            </SelectorCard>
+          </div>
         </div>
 
         {/* LOADING */}
         {loading && (
-          <div className="glass-card p-8 text-center animate-pulse">
+          <div
+            className="
+            mt-6
+            rounded-3xl
+            border
+            border-white/10
+            bg-white/[0.03]
+            backdrop-blur-2xl
+            p-8
+            text-center
+            text-slate-300
+            animate-pulse
+          "
+          >
             Loading vehicle data...
           </div>
         )}
 
         {/* RESULTS */}
         {vehicleData && !loading && (
-          <div className="glass-card p-8">
-            <div className="flex items-center gap-3 mb-8">
-              <div className="bg-emerald-500/20 p-3 rounded-2xl">
-                <Fuel className="text-emerald-400" size={24} />
+          <div
+            className="
+            mt-6
+            rounded-[32px]
+            border
+            border-white/10
+            bg-white/[0.03]
+            backdrop-blur-2xl
+            p-6
+            shadow-[0_0_50px_rgba(0,0,0,0.35)]
+          "
+          >
+            {/* HEADER */}
+            <div className="flex items-center gap-4 mb-8">
+              <div
+                className="
+                w-14
+                h-14
+                rounded-2xl
+                bg-emerald-500/10
+                border
+                border-emerald-500/20
+                flex
+                items-center
+                justify-center
+              "
+              >
+                <Fuel className="text-emerald-300" size={24} />
               </div>
 
               <div>
-                <h2 className="text-3xl font-bold">Fuel Economy</h2>
+                <h2 className="text-2xl font-bold tracking-tight">
+                  Fuel Economy
+                </h2>
 
-                <p className="text-slate-400">EPA estimated efficiency</p>
+                <p className="text-sm text-slate-400">
+                  EPA estimated efficiency
+                </p>
               </div>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-5 mb-8">
+            {/* METRICS */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-5">
               <MetricCard label="City MPG" value={vehicleData.cityMpg} />
 
               <MetricCard label="Highway MPG" value={vehicleData.highwayMpg} />
@@ -242,7 +638,8 @@ function App() {
               />
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+            {/* INFO */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <InfoCard label="Fuel Type" value={vehicleData.fuelType} />
 
               <InfoCard label="Transmission" value={vehicleData.transmission} />
