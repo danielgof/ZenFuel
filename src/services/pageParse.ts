@@ -58,12 +58,11 @@
 // chrome.runtime.onMessage.addListener((message: any, _sender: any, sendResponse: (response: any) => void) => {
 //   if (message.action === "SCRAPE_VEHICLE_DROPDOWNS") {
 //     const currentVehicleData = parseVehicleDropdowns();
-    
+
 //     console.log("Scraped Vehicle Data on Demand:", currentVehicleData);
-    
+
 //     // Respond directly back to the popup tab that called it
 //     sendResponse(currentVehicleData);
 //   }
 //   return true; // Essential for handling asynchronous message channels in Chrome extensions
 // });
-

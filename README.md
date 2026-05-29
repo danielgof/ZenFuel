@@ -3,10 +3,12 @@
 ZenFuel is a small Chrome extension that targets to help with analysis of vehicals fuel economy by referencing [https://www.fueleconomy.gov/](https://www.fueleconomy.gov/)
 
 **What's included**
+
 - React + TypeScript application scaffolded for Vite
 - Extension `manifest.json` in `public/` copied to `build/` during the build
 
 ## Prerequisites
+
 - Node.js (v20.19.0 or later recommended)
 - npm (bundled with Node.js)
 
@@ -40,15 +42,8 @@ npm run preview
 
 1. Run `npm run build` to produce the `build/` folder.
 2. Open the browser extensions page (`chrome://extensions` or `edge://extensions`).
-3. Enable *Developer mode*.
-4. Click *Load unpacked* and select the `build/` folder from this repository.
+3. Enable _Developer mode_.
+4. Click _Load unpacked_ and select the `build/` folder from this repository.
 
 The extension popup uses `build/index.html` and the manifest is `build/manifest.json`.
-
-## Troubleshooting
-
-- Could not load icon 'icon.svg': this error means the manifest references an icon file that doesn't exist in `public/`. The repository includes `favicon.svg` and `icons.svg` in `public/`. Update `public/manifest.json` to reference an existing file (the repo's manifest has been updated to use `favicon.svg`). After editing `public/manifest.json`, re-run `npm run build` and reload the unpacked extension.
-- Manifest fails to load after build: open `build/manifest.json` and verify that all paths (icons, popup) are relative and the files exist in `build/`.
-
-
 
