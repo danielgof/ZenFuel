@@ -65,6 +65,119 @@ function parseVehicleDropdowns() {
     };
 }
 
+function parseVehicleText(text) {
+    if (!text) {
+        return { year: '', make: '', model: '' };
+    }
+
+    const cleaned = text
+        .replace(/\|.*$/, '')
+        .replace(/[-–—]/g, ' ')
+        .replace(/[\u2018\u2019\u201C\u201D]/g, '')
+        .trim();
+    const words = cleaned.split(/\s+/);
+
+    let year = '';
+    let make = '';
+    let model = '';
+
+    const yearMatch = cleaned.match(/\b(19|20)\d{2}\b/);
+    if (yearMatch) {
+        year = yearMatch[0];
+    }
+
+    const knownMakes = [
+        'Acura','Audi','BMW','Buick','Cadillac','Chevrolet','Chrysler','Dodge','Ford','GMC','Honda','Hyundai','Infiniti','Jeep','Kia','Lexus','Mazda','Mercedes','Nissan','Subaru','Tesla','Toyota','Volkswagen','Volvo',
+    ];
+
+    for (const word of words) {
+        const found = knownMakes.find((m) => m.toLowerCase() === word.toLowerCase());
+        if (found) {
+            make = found;
+            break;
+        }
+    }
+
+    if (make) {
+        const makeIndex = words.findIndex((w) => w.toLowerCase() === make.toLowerCase());
+        const stopWords = ['SUV', 'Sedan', 'Truck', 'Crossover', 'Hybrid', 'Coupe', 'EV', 'Electric', 'Vehicle', 'Cars', 'for', 'in', 'with'];
+        const modelWords = [];
+
+        for (let i = makeIndex + 1; i < words.length; i += 1) {
+            const word = words[i];
+            if (stopWords.some((stop) => stop.toLowerCase() === word.toLowerCase())) {
+                break;
+            }
+            modelWords.push(word);
+        }
+
+        model = modelWords.join(' ').replace(/[^a-zA-Z0-9 ]/g, '').trim();
+    }
+
+    return { year, make, model };
+}
+
+function detectVehicleOnPage() {
+    const pageTitleDetection = parseVehicleText(document.title || '');
+
+    const headingDetection = getPageHeadings()
+        .map(parseVehicleText)
+        .find((candidate) => candidate.year || candidate.make || candidate.model);
+
+    const dropdownData = parseVehicleDropdowns();
+    const hasVehicleDropdowns = dropdownData.years.length > 0 || dropdownData.makes.length > 0 || dropdownData.models.length > 0;
+
+    if (pageTitleDetection.year || pageTitleDetection.make || pageTitleDetection.model) {
+        return { source: 'title', ...pageTitleDetection };
+    }
+
+    if (headingDetection) {
+        return { source: 'heading', ...headingDetection };
+    }
+
+    if (hasVehicleDropdowns) {
+        return { source: 'dropdown', year: '', make: '', model: '' };
+    }
+
+    return null;
+}
+
+let detectionSent = false;
+
+function sendDetectionToBackground() {
+    if (detectionSent) {
+        return;
+    }
+
+    const detected = detectVehicleOnPage();
+    if (!detected) {
+        return;
+    }
+
+    detectionSent = true;
+    chrome.runtime.sendMessage({ action: 'VEHICLE_DETECTED', detected }, (response) => {
+        if (chrome.runtime.lastError) {
+            console.warn('Vehicle detection notification failed:', chrome.runtime.lastError.message);
+        }
+    });
+}
+
+function watchForVehicleDetection() {
+    sendDetectionToBackground();
+
+    const observer = new MutationObserver(() => {
+        if (!detectionSent) {
+            sendDetectionToBackground();
+        }
+    });
+
+    observer.observe(document.documentElement || document.body, {
+        childList: true,
+        subtree: true,
+        attributes: true,
+    });
+}
+
 // =========================================================================
 // Listen for a direct request from App.js
 // =========================================================================
@@ -85,4 +198,8 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
         });
     }
     return true;
+});
+
+window.addEventListener('DOMContentLoaded', () => {
+    watchForVehicleDetection();
 });

@@ -14,8 +14,9 @@
     },
     "permissions": ["activeTab", "scripting"],
     "host_permissions": ["http://*/*", "https://*/*"],
-    "content_scripts": [
-        {
+  "background": {
+    "service_worker": "background.js"
+  },
             "matches": ["<all_urls>"],
             "js": ["content.js"],
             "run_at": "document_idle"
