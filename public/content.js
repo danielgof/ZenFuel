@@ -1,5 +1,51 @@
 // public/content.js
 
+function injectAlwaysActiveLogic() {
+    try {
+        Object.defineProperty(document, 'visibilityState', {
+            get: () => 'visible',
+            configurable: true,
+        });
+        Object.defineProperty(document, 'hidden', {
+            get: () => false,
+            configurable: true,
+        });
+
+        const blockVisibilityEvent = (e) => {
+            if (e.type === 'visibilitychange' || e.type === 'webkitvisibilitychange') {
+                e.stopImmediatePropagation();
+            }
+        };
+
+        document.addEventListener('visibilitychange', blockVisibilityEvent, true);
+        document.addEventListener('webkitvisibilitychange', blockVisibilityEvent, true);
+
+        Object.defineProperty(document, 'hasFocus', {
+            value: () => true,
+            configurable: true,
+        });
+
+        const blockBlurEvent = (e) => {
+            if (e.type === 'blur' || e.type === 'focusout') {
+                e.stopImmediatePropagation();
+                e.preventDefault();
+            }
+        };
+
+        window.addEventListener('blur', blockBlurEvent, true);
+        window.addEventListener('focusout', blockBlurEvent, true);
+    } catch (error) {
+        console.warn('Always-active injection failed:', error);
+    }
+}
+
+(function injectAlwaysActive() {
+    const script = document.createElement('script');
+    script.textContent = `(${injectAlwaysActiveLogic.toString()})();`;
+    (document.documentElement || document.head || document.body || document.documentElement).appendChild(script);
+    script.remove();
+})();
+
 function extractOptions(select) {
     if (!select) return [];
 
@@ -155,7 +201,7 @@ function sendDetectionToBackground() {
     }
 
     detectionSent = true;
-    chrome.runtime.sendMessage({ action: 'VEHICLE_DETECTED', detected }, (response) => {
+    chrome.runtime.sendMessage({ action: 'VEHICLE_DETECTED', detected }, () => {
         if (chrome.runtime.lastError) {
             console.warn('Vehicle detection notification failed:', chrome.runtime.lastError.message);
         }
@@ -200,6 +246,15 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
     return true;
 });
 
-window.addEventListener('DOMContentLoaded', () => {
-    watchForVehicleDetection();
-});
+if (window.top === window) {
+    if (document.readyState === 'loading') {
+        window.addEventListener('DOMContentLoaded', () => {
+            watchForVehicleDetection();
+        });
+    } else {
+        watchForVehicleDetection();
+    }
+} else {
+    // Avoid duplicate detection from subframes.
+    console.debug('Skipping vehicle detection in subframe');
+}
