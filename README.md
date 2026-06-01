@@ -1,10 +1,10 @@
 # ZenFuel
 
-ZenFuel is a small Chrome extension that targets to help with analysis of vehicals fuel economy by referencing [https://www.fueleconomy.gov/](https://www.fueleconomy.gov/)
+ZenFuel is a small Chrome extension that helps analyze vehicle fuel economy by referencing [https://www.fueleconomy.gov/](https://www.fueleconomy.gov/)
 
 **What's included**
 
-- React + TypeScript application scaffolded for Vite
+- Vanilla JavaScript application built with Vite
 - Extension `manifest.json` in `public/` copied to `build/` during the build
 
 ## Prerequisites
