@@ -170,12 +170,12 @@ function renderVehicleData() {
 
     metrics.forEach((metric) => {
         const card = document.createElement('div');
-        card.className = 'bg-white/5 border border-white/10 rounded-3xl p-6';
+        card.className = 'metric-card';
         card.innerHTML = `
-            <div class="flex items-center gap-2 text-slate-400 mb-4">
+            <div class="metric-meta">
                 <span>${metric.label}</span>
             </div>
-            <div class="text-5xl font-black">${metric.value}</div>
+            <div class="metric-value">${metric.value}</div>
         `;
         metricsGrid.appendChild(card);
     });
@@ -188,10 +188,10 @@ function renderVehicleData() {
 
     infos.forEach((info) => {
         const card = document.createElement('div');
-        card.className = 'bg-white/5 border border-white/10 rounded-2xl p-5';
+        card.className = 'info-card';
         card.innerHTML = `
-            <div class="text-slate-400 text-sm mb-2">${info.label}</div>
-            <div class="text-lg font-semibold">${info.value}</div>
+            <div class="info-label">${info.label}</div>
+            <div class="info-value">${info.value}</div>
         `;
         infoGrid.appendChild(card);
     });

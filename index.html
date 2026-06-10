@@ -6,55 +6,53 @@
         <meta name="viewport" content="width=device-width, initial-scale=1.0" />
         <title>Zen Fuel</title>
     </head>
-    <body class="bg-slate-950 text-white min-h-screen">
-        <div class="p-5 max-w-4xl mx-auto">
+    <body class="app-shell">
+        <div class="container">
 
-            <div id="detect-banner" class="mb-4 hidden rounded-3xl border border-emerald-500/20 bg-emerald-500/5 p-4 text-emerald-300"></div>
+            <div id="detect-banner" class="banner hidden"></div>
 
-            <div class="glass-card p-4 mb-4">
-                <div class="flex flex-col gap-4">
-                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div>
-                            <label class="block text-slate-200 mb-2" for="year-select">Year</label>
+            <div class="form-card mb-6">
+                <div class="form-card-content">
+                    <div class="form-row">
+                        <div class="form-field">
+                            <label class="form-label" for="year-select">Year</label>
                             <select id="year-select" class="select"><option value="">Select</option></select>
                         </div>
-                        <div>
-                            <label class="block text-slate-200 mb-2" for="make-select">Make</label>
+                        <div class="form-field">
+                            <label class="form-label" for="make-select">Make</label>
                             <select id="make-select" class="select" disabled><option value="">Select</option></select>
                         </div>
-                    </div>
-                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div>
-                            <label class="block text-slate-200 mb-2" for="model-select">Model</label>
+                        <div class="form-field">
+                            <label class="form-label" for="model-select">Model</label>
                             <select id="model-select" class="select" disabled><option value="">Select</option></select>
                         </div>
-                        <div>
-                            <label class="block text-slate-200 mb-2" for="trim-select">Trim</label>
+                        <div class="form-field">
+                            <label class="form-label" for="trim-select">Trim</label>
                             <select id="trim-select" class="select" disabled><option value="">Select</option></select>
                         </div>
                     </div>
 
-                    <button id="detect-btn" class="mt-2 w-full rounded-2xl bg-slate-800/80 px-4 py-3 text-sm font-semibold text-white transition hover:bg-slate-700">Detect vehicle from active tab</button>
+                    <button id="detect-btn" class="button">Detect vehicle from active tab</button>
                 </div>
             </div>
 
-            <div id="status" class="mb-4 text-sm text-slate-300"></div>
+            <div id="status" class="status-text"></div>
 
-            <div id="loading" class="rounded-3xl border border-white/10 bg-white/[0.03] p-8 text-center text-slate-300 hidden">Loading vehicle data...</div>
+            <div id="loading" class="panel-card loading-panel hidden">Loading vehicle data...</div>
 
-            <div id="result-panel" class="hidden rounded-[32px] border border-white/10 bg-white/[0.03] p-6">
-                <div class="flex items-center gap-4 mb-8">
-                    <div class="w-14 h-14 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center">
-                        <span class="text-emerald-300 text-2xl">⛽</span>
+            <div id="result-panel" class="panel-card hidden">
+                <div class="result-header">
+                    <div class="icon-badge">
+                        <span>⛽</span>
                     </div>
                     <div>
-                        <h2 class="text-2xl font-bold tracking-tight">Fuel Economy</h2>
-                        <p class="text-sm text-slate-400">EPA estimated efficiency</p>
+                        <h2 class="title">Fuel Economy</h2>
+                        <p class="subtitle">EPA estimated efficiency</p>
                     </div>
                 </div>
 
-                <div id="metrics-grid" class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-5"></div>
-                <div id="info-grid" class="grid grid-cols-1 md:grid-cols-3 gap-4"></div>
+                <div id="metrics-grid"></div>
+                <div id="info-grid"></div>
             </div>
         </div>
 
