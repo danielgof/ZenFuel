@@ -1,5 +1,17 @@
+/**
+ * Base URL for the fuel economy REST API.
+ * @constant {string}
+ */
 const BASE_URL = 'https://www.fueleconomy.gov/ws/rest';
 
+/**
+ * Fetches an XML response from the fuel economy API and returns a parsed XML Document.
+ *
+ * @param {string} endpoint - The API endpoint (should begin with `/`).
+ * @returns {Promise<Document>} A parsed XML Document.
+ * @throws {Error} When the network request fails, the response is empty, contains HTML
+ *                 instead of XML, or when XML parsing fails.
+ */
 async function fetchXML(endpoint) {
     const url = `${BASE_URL}${endpoint}`;
 
@@ -34,14 +46,33 @@ async function fetchXML(endpoint) {
     return xml;
 }
 
+/**
+ * Safely reads the text content of the first child element with the given tag name.
+ *
+ * @param {Document|Element} parent - XML Document or Element to search within.
+ * @param {string} tag - Tag name of the child element to read.
+ * @param {string} [fallback=''] - Value to return when the element or its text is missing.
+ * @returns {string} The trimmed text content or the fallback value.
+ */
 function getTextContent(parent, tag, fallback = '') {
     return parent.getElementsByTagName(tag)[0]?.textContent?.trim() || fallback;
 }
 
+/**
+ * Extracts `menuItem` elements from a returned XML document.
+ *
+ * @param {Document} xml - Parsed XML Document returned by the API.
+ * @returns {Element[]} Array of `menuItem` elements.
+ */
 function parseMenuItems(xml) {
     return Array.from(xml.getElementsByTagName('menuItem'));
 }
 
+/**
+ * Retrieves the list of available model years from the API.
+ *
+ * @returns {Promise<string[]>} Array of year values (strings). Returns an empty array on error.
+ */
 export async function getYears() {
     try {
         const xml = await fetchXML('/vehicle/menu/year');
@@ -52,6 +83,12 @@ export async function getYears() {
     }
 }
 
+/**
+ * Retrieves the list of vehicle makes for a given year.
+ *
+ * @param {string|number} year - Model year to query.
+ * @returns {Promise<string[]>} Array of make values (strings). Returns an empty array on error.
+ */
 export async function getMakes(year) {
     try {
         const xml = await fetchXML(`/vehicle/menu/make?year=${encodeURIComponent(year)}`);
@@ -62,6 +99,13 @@ export async function getMakes(year) {
     }
 }
 
+/**
+ * Retrieves the list of vehicle models for a given year and make.
+ *
+ * @param {string|number} year - Model year to query.
+ * @param {string} make - Make name to query.
+ * @returns {Promise<string[]>} Array of model values (strings). Returns an empty array on error.
+ */
 export async function getModels(year, make) {
     try {
         const xml = await fetchXML(
@@ -74,6 +118,14 @@ export async function getModels(year, make) {
     }
 }
 
+/**
+ * Retrieves option entries for a specific year/make/model combination.
+ *
+ * @param {string|number} year - Model year to query.
+ * @param {string} make - Make name to query.
+ * @param {string} model - Model name to query.
+ * @returns {Promise<Array<{text: string, value: string}>>} Array of option objects. Returns an empty array on error.
+ */
 export async function getOptions(year, make, model) {
     try {
         const xml = await fetchXML(
@@ -89,6 +141,13 @@ export async function getOptions(year, make, model) {
     }
 }
 
+/**
+ * Retrieves detailed vehicle information for a specific vehicle id.
+ *
+ * @param {string|number} id - Vehicle id returned from the options/menu endpoints.
+ * @returns {Promise<{cityMpg: string, highwayMpg: string, combinedMpg: string, fuelType: string, drive: string, transmission: string}>}
+ *          Object with MPG and drivetrain fields. Fields will be `'N/A'` when missing or on error.
+ */
 export async function getVehicleDetails(id) {
     const fallback = {
         cityMpg: 'N/A',
