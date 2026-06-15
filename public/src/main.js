@@ -425,7 +425,13 @@ modelSelect.addEventListener('change', handleModelSelection);
 trimSelect.addEventListener('change', handleTrimSelection);
 detectBtn.addEventListener('click', detectVehicleFromTab);
 
-window.addEventListener('DOMContentLoaded', async () => {
-    loadYears();
+const initialize = async () => {
+    await loadYears();
     detectVehicleFromTab();
-});
+};
+
+if (document.readyState === 'loading') {
+    window.addEventListener('DOMContentLoaded', initialize);
+} else {
+    initialize();
+}
