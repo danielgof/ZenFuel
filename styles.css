@@ -1,0 +1,41 @@
+/* Custom constraints for Chrome Extension popup viewport */
+.extension-window {
+    width: 320px;
+    box-sizing: border-box;
+}
+
+/* Custom rounded corners override for utility */
+.rounded-4 {
+    border-radius: 1rem !important;
+}
+
+/* Zen styling highlights */
+.text-gradient {
+    background: linear-gradient(45deg, #0aa2b8, #007a8c);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+}
+
+#fuel-btn {
+    background-color: #0aa2b8;
+    border-color: #0aa2b8;
+    transition: transform 0.1s ease, background-color 0.2s ease;
+}
+
+#fuel-btn:hover {
+    background-color: #008ca1;
+    border-color: #008ca1;
+}
+
+#fuel-btn:active {
+    transform: scale(0.97);
+}
+
+/* Custom indicator dot for the Bootstrap badge */
+.status-dot {
+    width: 7px;
+    height: 7px;
+    background-color: #198754; /* Bootstrap success green */
+    border-radius: 50%;
+    display: inline-block;
+}
