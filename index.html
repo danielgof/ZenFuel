@@ -16,7 +16,6 @@
       }
       .text-gradient {
         background: linear-gradient(45deg, #0dcaf0, #0d6efd);
-        -webkit-background-clip: text;
         -webkit-text-fill-color: transparent;
       }
       .status-dot {
@@ -38,29 +37,19 @@
       <header class="text-center mb-4">
         <div class="d-flex align-items-center justify-content-center gap-2 mb-2">
           <img src="icons/favicon.png" alt="Zen Fuel" width="28" height="28" onerror="this.style.display='none'"/>
-          <h1 class="h4 m-0 fw-bold text-dark text-gradient">Zen Fuel</h1>
+          <h1 class="h4 m-0 fw-bold">Zen Fuel</h1>
         </div>
         <p class="small text-muted mb-0 px-2" style="font-size: 0.8rem;">
           Vehicle efficiency insights powered by fueleconomy.gov
         </p>
       </header>
 
-      <main class="mb-4">
-        <div class="card border-0 shadow-sm rounded-4 bg-white text-center">
-          <div class="card-body py-3 px-3">
-            <p id="zen-quote" class="card-text fst-italic text-secondary mb-0 small">
-              "Quiet the mind and the soul will speak."
-            </p>
-          </div>
-        </div>
-      </main>
-
       <div class="d-grid mb-4">
         <button
           class="btn btn-info btn-lg rounded-3 text-white fw-medium shadow-sm py-2"
           id="read-btn"
         >
-          Breathe In
+          Get vehicle MPG
         </button>
       </div>
 
@@ -100,13 +89,6 @@
           </div>
         </div>
       </div>
-
-      <footer class="d-flex justify-content-center">
-        <div class="badge bg-white text-secondary border border-light-subtle rounded-pill px-3 py-2 d-flex align-items-center gap-2 shadow-sm">
-          <span class="status-dot"></span>
-          <span class="fw-normal" style="font-size: 0.75rem;">Balanced</span>
-        </div>
-      </footer>
 
     </div>
 

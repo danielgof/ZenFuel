@@ -27,21 +27,21 @@ document.getElementById("read-btn").addEventListener("click", async () => {
     });
 
     const pageText = executionResult.result;
-    console.log("Full text:", pageText);
+    // console.log("Full text:", pageText);
 
-    const vehicleDetails = parseVehicleDetails(pageText);
+    const vehicleDetails = await parseVehicleDetails(pageText);
     console.log(vehicleDetails);
 
     if (vehicleDetails) {
       const { year, make, model } = vehicleDetails;
-      
+
       getVehicleMpg(year, make, model).then((data) => {
         console.log(data);
         if (!data) {
           outputDiv.innerText = "Failed to fetch MPG data";
           return;
         }
-        
+
         const statusMessage = document.getElementById("status-message");
         if (statusMessage) {
           statusMessage.classList.add("d-none");
@@ -49,16 +49,16 @@ document.getElementById("read-btn").addEventListener("click", async () => {
 
         const carTitle = document.getElementById("car-title");
         if (carTitle) carTitle.innerText = data.vehicle;
-        
+
         const carFuel = document.getElementById("car-fuel");
         if (carFuel) carFuel.innerText = data.fuelType;
 
         const mpgCity = document.getElementById("mpg-city");
         if (mpgCity) mpgCity.innerText = data.cityMpg;
-        
+
         const mpgComb = document.getElementById("mpg-comb");
         if (mpgComb) mpgComb.innerText = data.combinedMpg;
-        
+
         const mpgHwy = document.getElementById("mpg-hwy");
         if (mpgHwy) mpgHwy.innerText = data.highwayMpg;
 
@@ -79,25 +79,98 @@ document.getElementById("read-btn").addEventListener("click", async () => {
  * @type {string[]}
  */
 const KNOWN_MAKES = [
-  "Aston Martin", "Alfa Romeo", "Audi", "Bentley", "BMW", "Bugatti", "Buick",
-  "Cadillac", "Chevrolet", "Chrysler", "Dodge", "Ferrari", "Fiat", "Ford",
-  "Genesis", "GMC", "Honda", "Hyundai", "Infiniti", "Jaguar", "Jeep", "Kia",
-  "Lamborghini", "Land Rover", "Lexus", "Lincoln", "Lotus", "Maserati", "Mazda",
-  "Mercedes-Benz", "MINI", "Mitsubishi", "Nissan", "Polestar", "Porsche", "Ram",
-  "Rivian", "Rolls-Royce", "Subaru", "Tesla", "Toyota", "Volkswagen", "Volvo",
+  "Aston Martin",
+  "Alfa Romeo",
+  "Audi",
+  "Bentley",
+  "BMW",
+  "Bugatti",
+  "Buick",
+  "Cadillac",
+  "Chevrolet",
+  "Chrysler",
+  "Dodge",
+  "Ferrari",
+  "Fiat",
+  "Ford",
+  "Genesis",
+  "GMC",
+  "Honda",
+  "Hyundai",
+  "Infiniti",
+  "Jaguar",
+  "Jeep",
+  "Kia",
+  "Lamborghini",
+  "Land Rover",
+  "Lexus",
+  "Lincoln",
+  "Lotus",
+  "Maserati",
+  "Mazda",
+  "Mercedes-Benz",
+  "MINI",
+  "Mitsubishi",
+  "Nissan",
+  "Polestar",
+  "Porsche",
+  "Ram",
+  "Rivian",
+  "Rolls-Royce",
+  "Subaru",
+  "Tesla",
+  "Toyota",
+  "Volkswagen",
+  "Volvo",
 ];
 
+
 /**
- * Fallback mapping of common vehicle models to their respective manufacturers.
- * @type {Object.<string, string>}
+ *
+ * @param {String} pageText
+ * @returns {Number} year
  */
-const MODEL_TO_MAKE = {
-  "CR-V": "Honda", Civic: "Honda", Accord: "Honda", Pilot: "Honda", Odyssey: "Honda", Ridgeline: "Honda",
-  Camry: "Toyota", Corolla: "Toyota", RAV4: "Toyota", Highlander: "Toyota",
-  Mustang: "Ford", "F-150": "Ford", Escape: "Ford", Explorer: "Ford",
-  Silverado: "Chevrolet", Equinox: "Chevrolet", Tahoe: "Chevrolet",
-  Cherokee: "Jeep", Wrangler: "Jeep", CRV: "Honda",
-};
+function getYear(pageText) {
+  const yearMatch = pageText.match(/\b(20\d{2}|19\d{2})\b/);
+  if (!yearMatch) return null;
+
+  const year = parseInt(yearMatch[1]);
+  console.log(year);
+  return year;
+}
+
+function getMake(pageText) {
+  if (!pageText) return null;
+
+  const normalizedText = pageText.toLowerCase();
+  const matchedMake = [...KNOWN_MAKES]
+    .sort((a, b) => b.length - a.length)
+    .find((make) => normalizedText.includes(make.toLowerCase()));
+
+  console.log("matched make:", matchedMake);
+  return matchedMake || null;
+}
+
+function getModel(pageText, availableModels) {
+  if (!pageText || !Array.isArray(availableModels) || availableModels.length === 0) {
+    return null;
+  }
+
+  const normalizedText = pageText.toLowerCase();
+
+  const matchedModel = [...availableModels]
+    .map((model) => ({
+      model,
+      score: model.toLowerCase().split(/[^a-z0-9]+/).filter(Boolean).reduce((sum, part) => {
+        return sum + (normalizedText.includes(part) ? 1 : 0);
+      }, 0),
+    }))
+    .sort((a, b) => b.score - a.score || a.model.length - b.model.length)
+    .find((entry) => entry.score > 0);
+
+  console.log("matched model:", matchedModel?.model || null);
+  return matchedModel?.model || null;
+}
 
 /**
  * Parses raw text to extract vehicle details like year, make, model, and remaining options.
@@ -106,48 +179,33 @@ const MODEL_TO_MAKE = {
  * @returns {number} return.year - The 4-digit automotive year.
  * @returns {string} return.make - The extracted or inferred manufacturer name.
  * @returns {string} return.model - The extracted model name.
- * @returns {string} return.options - Any remaining trim/spec text following the model.
  */
-function parseVehicleDetails(text) {
-  const yearMatch = text.match(/\b(20\d{2}|19\d{2})\b/);
-  if (!yearMatch) return null;
+async function parseVehicleDetails(text) {
+  // Get year
+  const year = getYear(text);
+  // Get make
+  const make = getMake(text);
 
-  const year = parseInt(yearMatch[1]);
-  const afterYearText = text.substring(text.indexOf(yearMatch[1]) + yearMatch[1].length).trim();
-  const words = afterYearText.split(/\s+/).filter((w) => w.length > 0);
+  let model = null;
 
-  if (words.length === 0) return null;
-
-  let make = null;
-  let makeWordCount = 0;
-
-  for (let i = Math.min(3, words.length); i >= 1; i--) {
-    const combinedWords = words.slice(0, i).join(" ");
-    const matchedMake = KNOWN_MAKES.find(
-      (km) => km.toLowerCase() === combinedWords.toLowerCase(),
-    );
-
-    if (matchedMake) {
-      make = matchedMake;
-      makeWordCount = i;
-      break;
+  if (year && make) {
+    try {
+      const modelsUrl = `https://www.fueleconomy.gov/ws/rest/vehicle/menu/model?year=${year}&make=${encodeURIComponent(make)}`;
+      const response = await fetch(modelsUrl, { headers: { Accept: "application/json" } });
+      const data = await response.json();
+      const modelList = Array.isArray(data.menuItem) ? data.menuItem : [data.menuItem];
+      const availableModels = modelList.map((item) => item?.value).filter(Boolean);
+      model = getModel(text, availableModels);
+      console.log("Model found: ", model)
+    } catch (error) {
+      console.error("Failed to resolve model:", error);
     }
   }
-
-  const remainingWords = words.slice(makeWordCount);
-  const model = remainingWords[0] || "";
-
-  if (!make && model) {
-    make = MODEL_TO_MAKE[model] || "";
-  }
-
-  const options = remainingWords.slice(1).join(" ");
 
   return {
     year,
     make: make || "",
     model: model || "",
-    options: options || "",
   };
 }
 
@@ -181,17 +239,14 @@ async function getVehicleMpg(year, make, model) {
       ? modelsData.menuItem
       : [modelsData.menuItem];
 
-    console.log("Available models:", modelList.map((m) => m?.value));
-
-    let matchedModel = modelList.find(
-      (m) => m?.value.toLowerCase() === model.toLowerCase(),
+    console.log(
+      "Available models:",
+      modelList.map((m) => m?.value),
     );
 
-    if (!matchedModel) {
-      matchedModel = modelList.find((m) =>
-        m?.value.toLowerCase().includes(model.toLowerCase()),
-      );
-    }
+    const matchedModel = modelList.find((m) =>
+      m?.value.toLowerCase().includes((model || "").toLowerCase()),
+    );
 
     if (!matchedModel) {
       throw new Error(
@@ -215,7 +270,10 @@ async function getVehicleMpg(year, make, model) {
       throw new Error("No vehicle configurations/options found.");
     }
 
-    console.log("Available options:", optionList.map((o) => ({ text: o?.text, value: o?.value })));
+    console.log(
+      "Available options:",
+      optionList.map((o) => ({ text: o?.text, value: o?.value })),
+    );
 
     const vehicleId = optionList[0].value;
     console.log("Using vehicle ID:", vehicleId);
