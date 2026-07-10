@@ -79,51 +79,50 @@ document.getElementById("read-btn").addEventListener("click", async () => {
  * @type {string[]}
  */
 const KNOWN_MAKES = [
-  "Aston Martin",
-  "Alfa Romeo",
-  "Audi",
-  "Bentley",
-  "BMW",
-  "Bugatti",
-  "Buick",
-  "Cadillac",
-  "Chevrolet",
-  "Chrysler",
-  "Dodge",
-  "Ferrari",
-  "Fiat",
-  "Ford",
-  "Genesis",
-  "GMC",
-  "Honda",
-  "Hyundai",
-  "Infiniti",
-  "Jaguar",
-  "Jeep",
-  "Kia",
-  "Lamborghini",
-  "Land Rover",
-  "Lexus",
-  "Lincoln",
-  "Lotus",
-  "Maserati",
-  "Mazda",
-  "Mercedes-Benz",
-  "MINI",
-  "Mitsubishi",
-  "Nissan",
-  "Polestar",
-  "Porsche",
-  "Ram",
-  "Rivian",
-  "Rolls-Royce",
-  "Subaru",
-  "Tesla",
-  "Toyota",
-  "Volkswagen",
-  "Volvo",
+	"Aston Martin",
+	"Alfa Romeo",
+	"Audi",
+	"Bentley",
+	"BMW",
+	"Bugatti",
+	"Buick",
+	"Cadillac",
+	"Chevrolet",
+	"Chrysler",
+	"Dodge",
+	"Ferrari",
+	"Fiat",
+	"Ford",
+	"Genesis",
+	"GMC",
+	"Honda",
+	"Hyundai",
+	"Infiniti",
+	"Jaguar",
+	"Jeep",
+	"Kia",
+	"Lamborghini",
+	"Land Rover",
+	"Lexus",
+	"Lincoln",
+	"Lotus",
+	"Maserati",
+	"Mazda",
+	"Mercedes-Benz",
+	"MINI",
+	"Mitsubishi",
+	"Nissan",
+	"Polestar",
+	"Porsche",
+	"Ram",
+	"Rivian",
+	"Rolls-Royce",
+	"Subaru",
+	"Tesla",
+	"Toyota",
+	"Volkswagen",
+	"Volvo",
 ];
-
 
 /**
  *
@@ -131,45 +130,79 @@ const KNOWN_MAKES = [
  * @returns {Number} year
  */
 function getYear(pageText) {
-  const yearMatch = pageText.match(/\b(20\d{2}|19\d{2})\b/);
-  if (!yearMatch) return null;
+	const yearMatch = pageText.match(/\b(20\d{2}|19\d{2})\b/);
+	if (!yearMatch) return null;
 
-  const year = parseInt(yearMatch[1]);
-  console.log(year);
-  return year;
+	const year = parseInt(yearMatch[1]);
+	console.log(year);
+	return year;
 }
 
 function getMake(pageText) {
-  if (!pageText) return null;
+	if (!pageText) return null;
 
-  const normalizedText = pageText.toLowerCase();
-  const matchedMake = [...KNOWN_MAKES]
-    .sort((a, b) => b.length - a.length)
-    .find((make) => normalizedText.includes(make.toLowerCase()));
+	const normalizedText = pageText.toLowerCase();
+	const matchedMake = [...KNOWN_MAKES]
+		.sort((a, b) => b.length - a.length)
+		.find((make) => normalizedText.includes(make.toLowerCase()));
 
-  console.log("matched make:", matchedMake);
-  return matchedMake || null;
+	console.log("matched make:", matchedMake);
+	return matchedMake || null;
 }
 
 function getModel(pageText, availableModels) {
-  if (!pageText || !Array.isArray(availableModels) || availableModels.length === 0) {
-    return null;
-  }
+	if (
+		!pageText ||
+		!Array.isArray(availableModels) ||
+		availableModels.length === 0
+	) {
+		return null;
+	}
 
-  const normalizedText = pageText.toLowerCase();
+	const normalizedText = pageText.toLowerCase();
 
-  const matchedModel = [...availableModels]
-    .map((model) => ({
-      model,
-      score: model.toLowerCase().split(/[^a-z0-9]+/).filter(Boolean).reduce((sum, part) => {
-        return sum + (normalizedText.includes(part) ? 1 : 0);
-      }, 0),
-    }))
-    .sort((a, b) => b.score - a.score || a.model.length - b.model.length)
-    .find((entry) => entry.score > 0);
+	console.log(pageText)
 
-  console.log("matched model:", matchedModel?.model || null);
-  return matchedModel?.model || null;
+	const keyWords = [];
+
+	for (let model = 0; model < availableModels.length; model++) {
+		const element = availableModels[model];
+		const words = element.split(" ");
+		console.log("============");
+		console.log(words);
+		console.log("============");
+		for (const word of words) {
+			if (!keyWords.includes(word)) {
+				keyWords.push(word);
+			}
+		}
+	}
+
+	const matchedKeywords = [...keyWords].reduce((acc, keyword) => {
+		const normalizedKeyword = keyword.toLowerCase();
+		const regex = new RegExp(`\\b${normalizedKeyword}\\b`, 'g');
+		const matches = normalizedText.match(regex) || [];
+		if (matches.length > 0) {
+			acc[normalizedKeyword] = matches.length;
+		}
+		return acc;
+	}, {});
+
+
+	const bestMatch = availableModels
+		.map((model) => {
+			const modelWords = model.toLowerCase().split(/\s+/).filter(Boolean);
+			const score = modelWords.reduce((sum, word) => {
+				return sum + (matchedKeywords[word] || 0);
+			}, 0);
+
+			return { model, score };
+		})
+		.sort((a, b) => b.score - a.score || a.model.length - b.model.length)[0];
+
+	console.log("best match:", bestMatch);
+
+	return bestMatch?.model || null;
 }
 
 /**
@@ -181,32 +214,38 @@ function getModel(pageText, availableModels) {
  * @returns {string} return.model - The extracted model name.
  */
 async function parseVehicleDetails(text) {
-  // Get year
-  const year = getYear(text);
-  // Get make
-  const make = getMake(text);
+	// Get year
+	const year = getYear(text);
+	// Get make
+	const make = getMake(text);
 
-  let model = null;
+	let model = null;
 
-  if (year && make) {
-    try {
-      const modelsUrl = `https://www.fueleconomy.gov/ws/rest/vehicle/menu/model?year=${year}&make=${encodeURIComponent(make)}`;
-      const response = await fetch(modelsUrl, { headers: { Accept: "application/json" } });
-      const data = await response.json();
-      const modelList = Array.isArray(data.menuItem) ? data.menuItem : [data.menuItem];
-      const availableModels = modelList.map((item) => item?.value).filter(Boolean);
-      model = getModel(text, availableModels);
-      console.log("Model found: ", model)
-    } catch (error) {
-      console.error("Failed to resolve model:", error);
-    }
-  }
+	if (year && make) {
+		try {
+			const modelsUrl = `https://www.fueleconomy.gov/ws/rest/vehicle/menu/model?year=${year}&make=${encodeURIComponent(make)}`;
+			const response = await fetch(modelsUrl, {
+				headers: { Accept: "application/json" },
+			});
+			const data = await response.json();
+			const modelList = Array.isArray(data.menuItem)
+				? data.menuItem
+				: [data.menuItem];
+			const availableModels = modelList
+				.map((item) => item?.value)
+				.filter(Boolean);
+			model = getModel(text, availableModels);
+			console.log("Model found: ", model);
+		} catch (error) {
+			console.error("Failed to resolve model:", error);
+		}
+	}
 
-  return {
-    year,
-    make: make || "",
-    model: model || "",
-  };
+	return {
+		year,
+		make: make || "",
+		model: model || "",
+	};
 }
 
 /**
@@ -225,79 +264,76 @@ async function parseVehicleDetails(text) {
  * @returns {Promise<VehicleMpgData|null>} A promise resolving to the MPG metric object, or null on error.
  */
 async function getVehicleMpg(year, make, model) {
-  const base_url = "https://www.fueleconomy.gov/ws/rest";
-  const headers = { Accept: "application/json" };
+	const base_url = "https://www.fueleconomy.gov/ws/rest";
+	const headers = { Accept: "application/json" };
 
-  try {
-    const modelsUrl = `${base_url}/vehicle/menu/model?year=${year}&make=${encodeURIComponent(make)}`;
-    console.log("Fetching models from:", modelsUrl);
-    const modelsResponse = await fetch(modelsUrl, { headers });
-    const modelsData = await modelsResponse.json();
-    console.log("Models data:", modelsData);
+	try {
+		const modelsUrl = `${base_url}/vehicle/menu/model?year=${year}&make=${encodeURIComponent(make)}`;
+		console.log("Fetching models from:", modelsUrl);
+		const modelsResponse = await fetch(modelsUrl, { headers });
+		const modelsData = await modelsResponse.json();
+		console.log("Models data:", modelsData);
 
-    const modelList = Array.isArray(modelsData.menuItem)
-      ? modelsData.menuItem
-      : [modelsData.menuItem];
+		const modelList = Array.isArray(modelsData.menuItem)
+		? modelsData.menuItem
+		: [modelsData.menuItem];
 
-    console.log(
-      "Available models:",
-      modelList.map((m) => m?.value),
-    );
+		console.log(
+			"Available models:",
+			modelList.map((m) => m?.value),
+		);
 
-    const matchedModel = modelList.find((m) =>
-      m?.value.toLowerCase().includes((model || "").toLowerCase()),
-    );
+		const matchedModel = modelList.find((m) =>
+			m?.value.toLowerCase().includes((model || "").toLowerCase()),
+		);
 
-    if (!matchedModel) {
-      throw new Error(
-        `Model "${model}" not found for ${year} ${make}. Available: ${modelList.map((m) => m?.value).join(", ")}`,
-      );
-    }
+		if (!matchedModel) {
+			throw new Error(
+				`Model "${model}" not found for ${year} ${make}. Available: ${modelList.map((m) => m?.value).join(", ")}`,
+			);
+		}
 
-    console.log(`Using model: ${matchedModel.value}`);
+		console.log(`Using model: ${matchedModel.value}`);
 
-    const optionsUrl = `${base_url}/vehicle/menu/options?year=${year}&make=${encodeURIComponent(make)}&model=${encodeURIComponent(matchedModel.value)}`;
-    console.log("Fetching options from:", optionsUrl);
-    const optionsResponse = await fetch(optionsUrl, { headers });
-    const optionsData = await optionsResponse.json();
-    console.log("Options data:", optionsData);
+		const optionsUrl = `${base_url}/vehicle/menu/options?year=${year}&make=${encodeURIComponent(make)}&model=${encodeURIComponent(matchedModel.value)}`;
+		console.log("Fetching options from:", optionsUrl);
+		const optionsResponse = await fetch(optionsUrl, { headers });
+		const optionsData = await optionsResponse.json();
+		console.log("Options data:", optionsData);
 
-    const optionList = Array.isArray(optionsData.menuItem)
-      ? optionsData.menuItem
-      : [optionsData.menuItem];
+		const optionList = Array.isArray(optionsData.menuItem)
+		? optionsData.menuItem
+		: [optionsData.menuItem];
 
-    if (!optionList || optionList.length === 0 || !optionList[0]) {
-      throw new Error("No vehicle configurations/options found.");
-    }
+		if (!optionList || optionList.length === 0 || !optionList[0]) {
+			throw new Error("No vehicle configurations/options found.");
+		}
 
-    console.log(
-      "Available options:",
-      optionList.map((o) => ({ text: o?.text, value: o?.value })),
-    );
+		console.log("Available options:", optionList.map((o) => ({ text: o?.text, value: o?.value })),);
 
-    const vehicleId = optionList[0].value;
-    console.log("Using vehicle ID:", vehicleId);
+		const vehicleId = optionList[0].value;
+		// console.log("Using vehicle ID:", vehicleId);
 
-    const vehicleUrl = `${base_url}/vehicle/${vehicleId}`;
-    console.log("Fetching vehicle data from:", vehicleUrl);
-    const vehicleResponse = await fetch(vehicleUrl, { headers });
+		const vehicleUrl = `${base_url}/vehicle/${vehicleId}`;
+		console.log("Fetching vehicle data from:", vehicleUrl);
+		const vehicleResponse = await fetch(vehicleUrl, { headers });
 
-    if (!vehicleResponse.ok) {
-      throw new Error(`API returned status ${vehicleResponse.status}`);
-    }
+		if (!vehicleResponse.ok) {
+		throw new Error(`API returned status ${vehicleResponse.status}`);
+		}
 
-    const vehicleData = await vehicleResponse.json();
-    console.log("Vehicle data:", vehicleData);
+		const vehicleData = await vehicleResponse.json();
+		console.log("Vehicle data:", vehicleData);
 
-    return {
-      vehicle: `${year} ${make} ${matchedModel.value} (${optionList[0].text})`,
-      cityMpg: vehicleData.city08,
-      highwayMpg: vehicleData.highway08,
-      combinedMpg: vehicleData.comb08,
-      fuelType: vehicleData.fuelType,
-    };
-  } catch (error) {
-    console.error("Failed to fetch MPG:", error);
-    return null;
-  }
+		return {
+		vehicle: `${year} ${make} ${matchedModel.value} (${optionList[0].text})`,
+		cityMpg: vehicleData.city08,
+		highwayMpg: vehicleData.highway08,
+		combinedMpg: vehicleData.comb08,
+		fuelType: vehicleData.fuelType,
+		};
+	} catch (error) {
+		console.error("Failed to fetch MPG:", error);
+		return null;
+	}
 }
