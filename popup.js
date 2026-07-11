@@ -6,73 +6,75 @@ function grabDOMContent() {
   return document.body.innerText;
 }
 
-document.getElementById("read-btn").addEventListener("click", async () => {
-  const outputDiv = document.getElementById("output");
-  outputDiv.innerText = "Reading...";
+if (typeof document !== "undefined" && document.getElementById("read-btn")) {
+  document.getElementById("read-btn").addEventListener("click", async () => {
+    const outputDiv = document.getElementById("output");
+    outputDiv.innerText = "Reading...";
 
-  try {
-    const [tab] = await chrome.tabs.query({
-      active: true,
-      currentWindow: true,
-    });
-
-    if (!tab) {
-      outputDiv.innerText = "No active tab found.";
-      return;
-    }
-
-    const [executionResult] = await chrome.scripting.executeScript({
-      target: { tabId: tab.id },
-      func: grabDOMContent,
-    });
-
-    const pageText = executionResult.result;
-    // console.log("Full text:", pageText);
-
-    const vehicleDetails = await parseVehicleDetails(pageText);
-    console.log(vehicleDetails);
-
-    if (vehicleDetails) {
-      const { year, make, model } = vehicleDetails;
-
-      getVehicleMpg(year, make, model).then((data) => {
-        console.log(data);
-        if (!data) {
-          outputDiv.innerText = "Failed to fetch MPG data";
-          return;
-        }
-
-        const statusMessage = document.getElementById("status-message");
-        if (statusMessage) {
-          statusMessage.classList.add("d-none");
-        }
-
-        const carTitle = document.getElementById("car-title");
-        if (carTitle) carTitle.innerText = data.vehicle;
-
-        const carFuel = document.getElementById("car-fuel");
-        if (carFuel) carFuel.innerText = data.fuelType;
-
-        const mpgCity = document.getElementById("mpg-city");
-        if (mpgCity) mpgCity.innerText = data.cityMpg;
-
-        const mpgComb = document.getElementById("mpg-comb");
-        if (mpgComb) mpgComb.innerText = data.combinedMpg;
-
-        const mpgHwy = document.getElementById("mpg-hwy");
-        if (mpgHwy) mpgHwy.innerText = data.highwayMpg;
-
-        const dataCard = document.getElementById("data-card");
-        if (dataCard) dataCard.classList.remove("d-none");
+    try {
+      const [tab] = await chrome.tabs.query({
+        active: true,
+        currentWindow: true,
       });
-    } else {
-      outputDiv.innerText = JSON.stringify(vehicleDetails, null, 2);
+
+      if (!tab) {
+        outputDiv.innerText = "No active tab found.";
+        return;
+      }
+
+      const [executionResult] = await chrome.scripting.executeScript({
+        target: { tabId: tab.id },
+        func: grabDOMContent,
+      });
+
+      const pageText = executionResult.result;
+      console.log("Full text:", pageText);
+
+      const vehicleDetails = await parseVehicleDetails(pageText);
+      console.log(vehicleDetails);
+
+      if (vehicleDetails) {
+        const { year, make, model } = vehicleDetails;
+
+        getVehicleMpg(year, make, model).then((data) => {
+          console.log(data);
+          if (!data) {
+            outputDiv.innerText = "Failed to fetch MPG data";
+            return;
+          }
+
+          const statusMessage = document.getElementById("status-message");
+          if (statusMessage) {
+            statusMessage.classList.add("d-none");
+          }
+
+          const carTitle = document.getElementById("car-title");
+          if (carTitle) carTitle.innerText = data.vehicle;
+
+          const carFuel = document.getElementById("car-fuel");
+          if (carFuel) carFuel.innerText = data.fuelType;
+
+          const mpgCity = document.getElementById("mpg-city");
+          if (mpgCity) mpgCity.innerText = data.cityMpg;
+
+          const mpgComb = document.getElementById("mpg-comb");
+          if (mpgComb) mpgComb.innerText = data.combinedMpg;
+
+          const mpgHwy = document.getElementById("mpg-hwy");
+          if (mpgHwy) mpgHwy.innerText = data.highwayMpg;
+
+          const dataCard = document.getElementById("data-card");
+          if (dataCard) dataCard.classList.remove("d-none");
+        });
+      } else {
+        outputDiv.innerText = JSON.stringify(vehicleDetails, null, 2);
+      }
+    } catch (error) {
+      outputDiv.innerText = "Error: " + error.message;
+      console.error(error);
     }
-  } catch (error) {
-    outputDiv.innerText = "Error: " + error.message;
-    console.error(error);
-  }
-});
+  });
+}
 
 /**
  * List of known multi-word and single-word vehicle manufacturers for matching.
@@ -150,6 +152,71 @@ function getMake(pageText) {
 	return matchedMake || null;
 }
 
+function normalizeText(text) {
+	return String(text || "")
+		.toLowerCase()
+		.replace(/[\W_]+/g, " ")
+		.replace(/\s+/g, " ")
+		.trim();
+}
+
+function tokenize(text) {
+	return normalizeText(text).split(" ").filter(Boolean);
+}
+
+function levenshteinDistance(a, b) {
+	const matrix = Array.from({ length: b.length + 1 }, (_, i) => [i]);
+	for (let j = 0; j <= a.length; j++) {
+		matrix[0][j] = j;
+	}
+
+	for (let i = 1; i <= b.length; i++) {
+		for (let j = 1; j <= a.length; j++) {
+			if (b[i - 1] === a[j - 1]) {
+				matrix[i][j] = matrix[i - 1][j - 1];
+			} else {
+				matrix[i][j] = Math.min(
+					matrix[i - 1][j] + 1,
+					matrix[i][j - 1] + 1,
+					matrix[i - 1][j - 1] + 1,
+				);
+			}
+		}
+	}
+
+	return matrix[b.length][a.length];
+}
+
+function getModelScore(model, pageText, pageTokens) {
+	const normalizedModel = normalizeText(model);
+	const modelTokens = tokenize(model);
+	let score = 0;
+
+	if (pageText.includes(normalizedModel)) {
+		score += 200 + normalizedModel.length;
+	}
+
+	for (const token of modelTokens) {
+		if (pageTokens.includes(token)) {
+			score += 20;
+		} else {
+			const bestDistance = Math.min(
+				...pageTokens.map((pageToken) => levenshteinDistance(token, pageToken)),
+			);
+			if (bestDistance === 1) {
+				score += 10;
+			} else if (bestDistance === 2) {
+				score += 4;
+			}
+		}
+	}
+
+	const distance = levenshteinDistance(normalizedModel, pageText.slice(0, normalizedModel.length + 30));
+	score += Math.max(0, 15 - distance);
+
+	return score;
+}
+
 function getModel(pageText, availableModels) {
 	if (
 		!pageText ||
@@ -159,45 +226,14 @@ function getModel(pageText, availableModels) {
 		return null;
 	}
 
-	const normalizedText = pageText.toLowerCase();
-
-	console.log(pageText)
-
-	const keyWords = [];
-
-	for (let model = 0; model < availableModels.length; model++) {
-		const element = availableModels[model];
-		const words = element.split(" ");
-		console.log("============");
-		console.log(words);
-		console.log("============");
-		for (const word of words) {
-			if (!keyWords.includes(word)) {
-				keyWords.push(word);
-			}
-		}
-	}
-
-	const matchedKeywords = [...keyWords].reduce((acc, keyword) => {
-		const normalizedKeyword = keyword.toLowerCase();
-		const regex = new RegExp(`\\b${normalizedKeyword}\\b`, 'g');
-		const matches = normalizedText.match(regex) || [];
-		if (matches.length > 0) {
-			acc[normalizedKeyword] = matches.length;
-		}
-		return acc;
-	}, {});
-
+	const normalizedText = normalizeText(pageText);
+	const pageTokens = tokenize(pageText);
 
 	const bestMatch = availableModels
-		.map((model) => {
-			const modelWords = model.toLowerCase().split(/\s+/).filter(Boolean);
-			const score = modelWords.reduce((sum, word) => {
-				return sum + (matchedKeywords[word] || 0);
-			}, 0);
-
-			return { model, score };
-		})
+		.map((model) => ({
+			model,
+			score: getModelScore(model, normalizedText, pageTokens),
+		}))
 		.sort((a, b) => b.score - a.score || a.model.length - b.model.length)[0];
 
 	console.log("best match:", bestMatch);
@@ -336,4 +372,8 @@ async function getVehicleMpg(year, make, model) {
 		console.error("Failed to fetch MPG:", error);
 		return null;
 	}
+}
+
+if (typeof module !== "undefined" && typeof module.exports !== "undefined") {
+	module.exports = { getModel };
 }
