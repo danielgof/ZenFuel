@@ -152,6 +152,34 @@ function getMake(pageText) {
 	return matchedMake || null;
 }
 
+const MODEL_SUFFIXES = [
+	"awd",
+	"fwd",
+	"hybrid",
+	"trailsport",
+	"trail",
+	"sport",
+	"touring",
+	"elite",
+	"black",
+	"limited",
+	"lx",
+	"ex",
+	"se",
+	"gt",
+	"premium",
+	"plug",
+	"in",
+	"electric",
+	"ev",
+	"e",
+	"fcev",
+	"turbo",
+	"diesel",
+	"gas",
+	"px",
+];
+
 function normalizeText(text) {
 	return String(text || "")
 		.toLowerCase()
@@ -162,6 +190,29 @@ function normalizeText(text) {
 
 function tokenize(text) {
 	return normalizeText(text).split(" ").filter(Boolean);
+}
+
+function getModelBase(model) {
+	const normalizedTokens = tokenize(model);
+	const baseTokens = [];
+
+	for (const token of normalizedTokens) {
+		if (MODEL_SUFFIXES.includes(token)) {
+			break;
+		}
+		baseTokens.push(token);
+	}
+
+	if (baseTokens.length === 0) {
+		return model;
+	}
+
+	const originalTokens = model
+		.split(/\s+/)
+		.filter(Boolean)
+		.slice(0, baseTokens.length);
+
+	return originalTokens.join(" ");
 }
 
 function levenshteinDistance(a, b) {
@@ -187,32 +238,57 @@ function levenshteinDistance(a, b) {
 	return matrix[b.length][a.length];
 }
 
+function countWholeWordOccurrences(text, phrase) {
+	if (!phrase) return 0;
+	const escaped = phrase.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+	const regex = new RegExp(`\\b${escaped}\\b`, "g");
+	const matches = text.match(regex);
+	return matches ? matches.length : 0;
+}
+
+function findFirstIndex(text, phrase) {
+	if (!phrase) return -1;
+	const escaped = phrase.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+	const regex = new RegExp(`\\b${escaped}\\b`, "g");
+	const match = regex.exec(text);
+	return match ? match.index : -1;
+}
+
 function getModelScore(model, pageText, pageTokens) {
 	const normalizedModel = normalizeText(model);
+	const normalizedRoot = normalizeText(getModelBase(model));
 	const modelTokens = tokenize(model);
 	let score = 0;
 
-	if (pageText.includes(normalizedModel)) {
-		score += 200 + normalizedModel.length;
+	const exactCount = countWholeWordOccurrences(pageText, normalizedModel);
+	const rootCount = countWholeWordOccurrences(pageText, normalizedRoot);
+	const exactIndex = findFirstIndex(pageText, normalizedModel);
+	const rootIndex = findFirstIndex(pageText, normalizedRoot);
+
+	if (exactCount > 0) {
+		score += 200 + exactCount * 50;
+		score += Math.max(0, 40 - Math.floor(exactIndex / 5));
+	}
+
+	if (rootCount > 0) {
+		score += 20 + rootCount * 20;
+		score += Math.max(0, 20 - Math.floor(rootIndex / 10));
 	}
 
 	for (const token of modelTokens) {
 		if (pageTokens.includes(token)) {
-			score += 20;
+			score += 12;
 		} else {
 			const bestDistance = Math.min(
 				...pageTokens.map((pageToken) => levenshteinDistance(token, pageToken)),
 			);
 			if (bestDistance === 1) {
-				score += 10;
+				score += 8;
 			} else if (bestDistance === 2) {
-				score += 4;
+				score += 3;
 			}
 		}
 	}
-
-	const distance = levenshteinDistance(normalizedModel, pageText.slice(0, normalizedModel.length + 30));
-	score += Math.max(0, 15 - distance);
 
 	return score;
 }
@@ -229,16 +305,46 @@ function getModel(pageText, availableModels) {
 	const normalizedText = normalizeText(pageText);
 	const pageTokens = tokenize(pageText);
 
-	const bestMatch = availableModels
-		.map((model) => ({
+	const rootScores = new Map();
+	const candidates = availableModels.map((model) => {
+		const root = getModelBase(model);
+		const normalizedRoot = normalizeText(root);
+		const rootCount = countWholeWordOccurrences(normalizedText, normalizedRoot);
+		const rootIndex = findFirstIndex(normalizedText, normalizedRoot);
+		const existing = rootScores.get(normalizedRoot) || { root, count: 0, index: -1 };
+		existing.count = Math.max(existing.count, rootCount);
+		if (rootIndex >= 0 && (existing.index < 0 || rootIndex < existing.index)) {
+			existing.index = rootIndex;
+		}
+		rootScores.set(normalizedRoot, existing);
+
+		return {
 			model,
 			score: getModelScore(model, normalizedText, pageTokens),
-		}))
+			exactIndex: findFirstIndex(normalizedText, normalizeText(model)),
+		};
+	});
+
+	const bestMatch = candidates
 		.sort((a, b) => b.score - a.score || a.model.length - b.model.length)[0];
+	const bestRoot = [...rootScores.values()]
+		.sort((a, b) => b.count - a.count || a.index - b.index || b.root.length - a.root.length)[0];
+
+	if (bestRoot && bestMatch) {
+		const bestMatchRoot = getModelBase(bestMatch.model);
+		if (
+			bestRoot.root.toLowerCase() !== bestMatchRoot.toLowerCase() &&
+			bestRoot.count > 0 &&
+			(bestRoot.index >= 0 && bestRoot.index < bestMatch.exactIndex)
+		) {
+			console.log("root fallback model:", bestRoot.root);
+			return bestRoot.root;
+		}
+	}
 
 	console.log("best match:", bestMatch);
 
-	return bestMatch?.model || null;
+	return bestMatch?.model;
 }
 
 /**
