@@ -150,6 +150,41 @@ function getMake(pageText) {
 	return matchedMake || null;
 }
 
+function normalizeText(text) {
+	return String(text || "")
+		.toLowerCase()
+		.replace(/[\W_]+/g, " ")
+		.replace(/\s+/g, " ")
+		.trim();
+}
+
+function tokenize(text) {
+	return normalizeText(text).split(" ").filter(Boolean);
+}
+
+function levenshteinDistance(a, b) {
+	const matrix = Array.from({ length: b.length + 1 }, (_, i) => [i]);
+	for (let j = 0; j <= a.length; j++) {
+		matrix[0][j] = j;
+	}
+
+	for (let i = 1; i <= b.length; i++) {
+		for (let j = 1; j <= a.length; j++) {
+			if (b[i - 1] === a[j - 1]) {
+				matrix[i][j] = matrix[i - 1][j - 1];
+			} else {
+				matrix[i][j] = Math.min(
+					matrix[i - 1][j] + 1,
+					matrix[i][j - 1] + 1,
+					matrix[i - 1][j - 1] + 1,
+				);
+			}
+		}
+	}
+
+	return matrix[b.length][a.length];
+}
+
 function getModel(pageText, availableModels) {
 	if (
 		!pageText ||
@@ -159,48 +194,46 @@ function getModel(pageText, availableModels) {
 		return null;
 	}
 
-	const normalizedText = pageText.toLowerCase();
+	const normalizedText = normalizeText(pageText);
+	const pageTokens = tokenize(pageText);
 
-	console.log(pageText)
+	const candidateScores = availableModels.map((model) => {
+		const normalizedModel = normalizeText(model);
+		const modelTokens = tokenize(model);
+		let score = 0;
 
-	const keyWords = [];
+		if (normalizedText.includes(normalizedModel)) {
+			score += 120;
+		}
 
-	for (let model = 0; model < availableModels.length; model++) {
-		const element = availableModels[model];
-		const words = element.split(" ");
-		console.log("============");
-		console.log(words);
-		console.log("============");
-		for (const word of words) {
-			if (!keyWords.includes(word)) {
-				keyWords.push(word);
+		for (const token of modelTokens) {
+			const directMatches = pageTokens.filter((pageToken) => pageToken === token).length;
+			score += directMatches * 20;
+
+			if (directMatches === 0) {
+				for (const pageToken of pageTokens) {
+					if (pageToken.startsWith(token) || token.startsWith(pageToken)) {
+						score += 8;
+						break;
+					}
+				}
+			}
+
+			const closest = Math.min(
+				...pageTokens.map((pageToken) => levenshteinDistance(pageToken, token)),
+			);
+			if (closest === 1) {
+				score += 6;
+			} else if (closest === 2) {
+				score += 3;
 			}
 		}
-	}
 
-	const matchedKeywords = [...keyWords].reduce((acc, keyword) => {
-		const normalizedKeyword = keyword.toLowerCase();
-		const regex = new RegExp(`\\b${normalizedKeyword}\\b`, 'g');
-		const matches = normalizedText.match(regex) || [];
-		if (matches.length > 0) {
-			acc[normalizedKeyword] = matches.length;
-		}
-		return acc;
-	}, {});
+		return { model, score };
+	});
 
-
-	const bestMatch = availableModels
-		.map((model) => {
-			const modelWords = model.toLowerCase().split(/\s+/).filter(Boolean);
-			const score = modelWords.reduce((sum, word) => {
-				return sum + (matchedKeywords[word] || 0);
-			}, 0);
-
-			return { model, score };
-		})
+	const bestMatch = candidateScores
 		.sort((a, b) => b.score - a.score || a.model.length - b.model.length)[0];
-
-	console.log("best match:", bestMatch);
 
 	return bestMatch?.model || null;
 }
